@@ -128,7 +128,8 @@ if user["role"] == "teacher":
     if not os.path.exists(LES_FILE):
         pd.DataFrame(columns=["Datum", "Klas", "Lesaanpak", "Klasmanagement", "Positief", "Negatief"]).to_csv(LES_FILE, index=False)
 
-    day_df = pd.read_csv(DAY_FILE, parse_dates=["Datum"])
+    day_df = pd.read_csv(DAY_FILE)
+    day_df["Datum"] = pd.to_datetime(day_df["Datum"], errors="coerce")
     les_df = pd.read_csv(LES_FILE, parse_dates=["Datum"])
 
     # ---- tabs staan nu binnen de teacher if ----
@@ -290,6 +291,7 @@ else:
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Nog geen data van leerkrachten beschikbaar.")
+
 
 
 
