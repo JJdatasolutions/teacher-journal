@@ -95,13 +95,37 @@ if not df.empty:
     st.markdown("---")
     m1, m2, m3 = st.columns(3)
     m1.metric("Total Classes", len(df))
-    # Calculate Arrow for Energy (Current vs Average)
     avg_en = df['Energy'].mean()
-    curr_en = df.iloc[-1]['Energy']
-    m2.metric("Avg Energy", f"{avg_en:.1f}", delta=f"{curr_en - avg_en:.1f} recent")
+    m2.metric("Avg Energy", f"{avg_en:.1f}")
     m3.metric("Avg Stress", f"{df['Stress'].mean():.1f}")
 
+    # NEW: VIBE VISUALIZATION (This is what you were missing!)
+    st.subheader("🏷️ Vibe Frequency")
+    # This logic uncurls the list of tags and counts them
+    all_tags = df['Tags'].dropna().str.split(', ').explode()
+    all_tags = all_tags[all_tags != ""] # Remove empty strings
+    
+    if not all_tags.empty:
+        tag_counts = all_tags.value_counts().reset_index()
+        tag_counts.columns = ['Vibe', 'Count']
+        
+        # Color the bars: Green-ish for positive vibes, Red-ish for stress
+        fig_vibe = px.bar(
+            tag_counts, 
+            x='Count', 
+            y='Vibe', 
+            orientation='h',
+            color='Count',
+            color_continuous_scale='Viridis',
+            height=300
+        )
+        fig_vibe.update_layout(showlegend=False, margin=dict(l=20, r=20, t=20, b=20))
+        st.plotly_chart(fig_vibe, use_container_width=True)
+    else:
+        st.info("No vibes logged yet.")
+
     # --- B. TABS FOR FUNCTIONALITY ---
+    # (Rest of the tabs code stays the same...)
     tab1, tab2, tab3, tab4 = st.tabs(["🔥 Activity", "⚔️ Compare", "🔍 Search", "📧 Report"])
 
     # TAB 1: STRAVA-STYLE HEATMAP
@@ -236,3 +260,4 @@ REFLECTIONS:
 
 else:
     st.info("👈 Tap 'Log New Session' to start your first entry!")
+
