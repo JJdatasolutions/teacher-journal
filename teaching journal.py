@@ -143,85 +143,90 @@ if user["role"] == "teacher":
                 st.success("Les opgeslagen")
                 st.rerun()
 
+    # ---------- VERGELIJK KLASSEN ----------
     with tab2:
-    if df.empty:
-        st.info("Nog geen data")
-    else:
-        norm_df = df.copy()
-
-        # Normaliseren naar schaal /5
-        norm_df["Energie (op 5)"] = norm_df["Energie"] / 2
-        norm_df["Stress (op 5)"] = norm_df["Stress"] / 2
-        norm_df["Didactiek (op 5)"] = norm_df["Didactiek"]
-        norm_df["Klasmanagement (op 5)"] = norm_df["Klasmanagement"]
-
-        heatmap_df = (
-            norm_df
-            .groupby("Klas")[[
-                "Energie (op 5)",
-                "Stress (op 5)",
-                "Didactiek (op 5)",
-                "Klasmanagement (op 5)"
-            ]]
-            .mean()
-            .round(2)
-        )
-
-        fig = px.imshow(
-            heatmap_df,
-            text_auto=True,
-            aspect="auto",
-            color_continuous_scale="RdYlGn",
-            title="Gemiddelde leservaring per klas (schaal op 5)"
-        )
-
-        fig.update_layout(
-            xaxis_title="Dimensie",
-            yaxis_title="Klas"
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
-
-
-    with tab3:
-    if df.empty:
-        st.info("Nog geen mood-data")
-    else:
-        pos = df["Positief"].fillna("").astype(str).str.split(", ").explode()
-        neg = df["Negatief"].fillna("").astype(str).str.split(", ").explode()
-
-        mood_df = pd.DataFrame({
-            "Mood": list(pos) + list(neg),
-            "Type": (
-                ["Positief"] * len(pos)
-                + ["Negatief"] * len(neg)
-            )
-        })
-
-        mood_df = mood_df[mood_df["Mood"] != ""]
-
-        if mood_df.empty:
-            st.info("Nog geen mood-tags geregistreerd")
+        if df.empty:
+            st.info("Nog geen data")
         else:
-            fig = px.histogram(
-                mood_df,
-                y="Mood",
-                color="Type",
-                barmode="group",
-                title="Lesmoods – frequentie",
-                color_discrete_map={
-                    "Positief": "#2ECC71",
-                    "Negatief": "#E74C3C"
-                }
+            norm_df = df.copy()
+
+            # Normaliseren naar schaal /5
+            norm_df["Energie (op 5)"] = norm_df["Energie"] / 2
+            norm_df["Stress (op 5)"] = norm_df["Stress"] / 2
+            norm_df["Didactiek (op 5)"] = norm_df["Didactiek"]
+            norm_df["Klasmanagement (op 5)"] = norm_df["Klasmanagement"]
+
+            heatmap_df = (
+                norm_df
+                .groupby("Klas")[[
+                    "Energie (op 5)",
+                    "Stress (op 5)",
+                    "Didactiek (op 5)",
+                    "Klasmanagement (op 5)"
+                ]]
+                .mean()
+                .round(2)
+            )
+
+            fig = px.imshow(
+                heatmap_df,
+                text_auto=True,
+                aspect="auto",
+                color_continuous_scale="RdYlGn",
+                title="Gemiddelde leservaring per klas (schaal op 5)"
             )
 
             fig.update_layout(
-                yaxis_title="Lesmood",
-                xaxis_title="Aantal keer gekozen"
+                xaxis_title="Dimensie",
+                yaxis_title="Klas"
             )
 
             st.plotly_chart(fig, use_container_width=True)
 
+    # ---------- LESMOOD ----------
+    with tab3: # Deze stond in jouw snippet niet ver genoeg naar links
+        if df.empty:
+            st.info("Nog geen mood-data")
+        else:
+            # Splits de tags
+            pos = df["Positief"].fillna("").astype(str).str.split(", ").explode()
+            neg = df["Negatief"].fillna("").astype(str).str.split(", ").explode()
+
+            # Maak DataFrame voor mood-visualisatie
+            mood_df = pd.DataFrame({
+                "Mood": list(pos) + list(neg),
+                "Type": (["Positief"] * len(pos) + ["Negatief"] * len(neg))
+            })
+
+            # Filter lege strings
+            mood_df = mood_df[mood_df["Mood"] != ""]
+
+            if mood_df.empty:
+                st.info("Nog geen mood-tags geregistreerd")
+            else:
+                # Sorteer op frequentie
+                mood_order = mood_df["Mood"].value_counts().index.tolist()
+                
+                fig = px.histogram(
+                    mood_df,
+                    y="Mood",
+                    color="Type",
+                    barmode="group",
+                    title="Lesmoods – frequentie",
+                    category_orders={"Mood": mood_order},
+                    color_discrete_map={
+                        "Positief": "#2ECC71", # Groen
+                        "Negatief": "#E74C3C"  # Rood
+                    }
+                )
+
+                fig.update_layout(
+                    yaxis_title="Lesmood",
+                    xaxis_title="Aantal keer gekozen",
+                    legend_title="Type"
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
 
 # DIRECTOR VIEW
 else:
@@ -257,4 +262,5 @@ else:
             st.plotly_chart(fig_dir, use_container_width=True)
     else:
         st.info("Nog geen data beschikbaar om een overzicht te genereren.")
+
 
