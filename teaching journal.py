@@ -7,147 +7,141 @@ import os
 
 # --- CONFIGURATION ---
 FILE_PATH = 'teaching_journal.csv'
-st.set_page_config(page_title="Teacher's Strava", page_icon="🍎", layout="wide")
+st.set_page_config(page_title="Teacher's Log", page_icon="🍎", layout="centered") 
+# Note: 'centered' layout often looks better on mobile vertical screens than 'wide'
 
 # --- DATA HANDLING ---
 def load_data():
     if not os.path.exists(FILE_PATH):
-        # Create an empty dataframe with columns if file doesn't exist
         df = pd.DataFrame(columns=[
-            'Date', 'Class_Group', 'Subject_Topic', 
+            'Date', 'Class_Group', 
             'Mental_State', 'Energy', 'Stress', 
-            'Didactics', 'Class_Management', 'Notes'
+            'Didactics', 'Class_Management', 
+            'Tags', 'Notes'
         ])
         df.to_csv(FILE_PATH, index=False)
-    
     return pd.read_csv(FILE_PATH)
 
 def save_data(entry):
     df = load_data()
-    # Convert new entry to dataframe
+    # Convert tags list to a string so it saves in CSV easily
+    entry['Tags'] = ", ".join(entry['Tags'])
     new_entry_df = pd.DataFrame([entry])
-    # Concatenate and save
     df = pd.concat([df, new_entry_df], ignore_index=True)
     df.to_csv(FILE_PATH, index=False)
 
-# --- SIDEBAR: LOGGING (The "Record Activity" button) ---
-st.sidebar.header("📝 Log Your Day")
-st.sidebar.write("Reflect on your teaching day.")
+# --- APP HEADER ---
+st.title("🍎 Teacher's Log")
 
-with st.sidebar.form(key='log_form'):
-    entry_date = st.date_input("Date", date.today())
-    class_group = st.text_input("Class/Group (e.g., 4B, Seniors)", "General")
-    topic = st.text_input("Topic Taught", "English Literature")
-    
-    st.markdown("---")
-    st.markdown("**Internal State (1-10)**")
-    mental = st.slider("Mental Clarity", 1, 10, 7)
-    energy = st.slider("Energy Level", 1, 10, 6)
-    stress = st.slider("Stress Level (1=Zen, 10=Panic)", 1, 10, 3)
-    
-    st.markdown("---")
-    st.markdown("**Teaching Performance (1-5 Stars)**")
-    didactics = st.select_slider("Didactic Success (Methodology)", options=[1, 2, 3, 4, 5], value=3)
-    management = st.select_slider("Classroom Management", options=[1, 2, 3, 4, 5], value=3)
-    
-    notes = st.text_area("Notes / Aha Moment / Struggle")
-    
-    submit_button = st.form_submit_button(label='Save Entry')
+# --- INPUT FORM (Mobile Friendly Expander) ---
+with st.expander("➕ Tap to Log Day", expanded=True):
+    with st.form(key='log_form'):
+        st.subheader("1. The Basics")
+        col1, col2 = st.columns(2)
+        with col1:
+            entry_date = st.date_input("Date", date.today())
+        with col2:
+            # The specific classes you requested
+            class_options = ['5MT', '6MT', '5HW', '6WEWI', '5ECMT', '5ECWI', '3MT']
+            class_group = st.selectbox("Class Group", class_options)
+        
+        st.markdown("---")
+        st.subheader("2. How did it feel?")
+        
+        # Tags selection
+        tag_options = [
+            "Respectful", "Energizing", "Inspiring", "Collaborative", "Active", # Positives
+            "Stressful", "Unrespectful", "Rebellious", "Lazy", "Passive",       # Challenges
+            "Chaotic", "Funny", "Focused", "Drained", "Proud"                   # Extras
+        ]
+        tags = st.multiselect("Select Key Vibe(s):", tag_options)
+        
+        # Sliders - Compact for mobile
+        st.write("**(Low 1 — 10 High)**")
+        mental = st.slider("🧠 Mental Clarity", 1, 10, 7)
+        energy = st.slider("⚡ Energy Level", 1, 10, 6)
+        stress = st.slider("😰 Stress Level", 1, 10, 3)
+        
+        st.markdown("---")
+        st.subheader("3. Performance")
+        # Using columns to put these side-by-side on wider screens, stacked on phone
+        c1, c2 = st.columns(2)
+        with c1:
+            didactics = st.selectbox("Didactics / Method", [1, 2, 3, 4, 5], index=2, help="5 = Perfect lesson flow")
+        with c2:
+            management = st.selectbox("Class Management", [1, 2, 3, 4, 5], index=2, help="5 = Perfect control")
+        
+        notes = st.text_area("Quick Notes (Optional)", placeholder="What stood out?")
+        
+        submit_button = st.form_submit_button(label='💾 Save Entry', type="primary")
 
-    if submit_button:
-        entry = {
-            'Date': entry_date,
-            'Class_Group': class_group,
-            'Subject_Topic': topic,
-            'Mental_State': mental,
-            'Energy': energy,
-            'Stress': stress,
-            'Didactics': didactics,
-            'Class_Management': management,
-            'Notes': notes
-        }
-        save_data(entry)
-        st.success("Day logged successfully!")
+        if submit_button:
+            entry = {
+                'Date': entry_date,
+                'Class_Group': class_group,
+                'Mental_State': mental,
+                'Energy': energy,
+                'Stress': stress,
+                'Didactics': didactics,
+                'Class_Management': management,
+                'Tags': tags,
+                'Notes': notes
+            }
+            save_data(entry)
+            st.success("Saved!")
+            st.rerun()
 
-# --- MAIN DASHBOARD ---
-st.title("🍎 The Teaching Dashboard")
-st.markdown("Your professional fitness tracker.")
+# --- DASHBOARD ---
+st.markdown("---")
+st.header("📊 Your Stats")
 
 df = load_data()
 
 if not df.empty:
-    # Convert date column to datetime objects
     df['Date'] = pd.to_datetime(df['Date'])
     df = df.sort_values(by='Date')
 
-    # 1. TOP METRICS (Strava Style)
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Total Classes Logged", len(df))
-    with col2:
-        avg_energy = df['Energy'].mean()
-        st.metric("Avg. Energy", f"{avg_energy:.1f}/10")
-    with col3:
-        # Calculate trend (compare last entry to average)
-        last_stress = df.iloc[-1]['Stress']
-        avg_stress = df['Stress'].mean()
-        delta = last_stress - avg_stress
-        st.metric("Current Stress", f"{last_stress}/10", delta=f"{delta:.1f} vs avg", delta_color="inverse")
-    with col4:
-        avg_sat = (df['Didactics'].mean() + df['Class_Management'].mean()) / 2
-        st.metric("Teaching Satisfaction", f"{avg_sat:.1f}/5")
+    # 1. Quick Metrics Row
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.metric("Classes", len(df))
+    with m2:
+        st.metric("Avg Stress", f"{df['Stress'].mean():.1f}")
+    with m3:
+        st.metric("Avg Energy", f"{df['Energy'].mean():.1f}")
 
-    st.markdown("---")
-
-    # 2. VISUALIZATIONS
-    c1, c2 = st.columns(2)
-
-    with c1:
-        st.subheader("⚡ Energy vs. Stress Over Time")
-        # Line chart
-        fig_line = px.line(df, x='Date', y=['Energy', 'Stress'], 
-                           title="Burnout Watcher", markers=True,
-                           color_discrete_map={"Energy": "#2ECC71", "Stress": "#E74C3C"})
-        st.plotly_chart(fig_line, use_container_width=True)
-
-    with c2:
-        st.subheader("🎓 Performance Breakdown")
-        # Radar Chart for the latest entry (or average)
-        categories = ['Mental', 'Didactics (Scaled)', 'Management (Scaled)', 'Energy', 'Inverted Stress']
+    # 2. Tag Analysis (New Feature!)
+    st.subheader("🏷️ Mood Frequency")
+    # Process tags: split the strings back into a list of words
+    all_tags = []
+    for tag_string in df['Tags']:
+        if isinstance(tag_string, str):
+            all_tags.extend(tag_string.split(", "))
+            
+    if all_tags:
+        # Filter out empty strings if any
+        all_tags = [t for t in all_tags if t]
+        from collections import Counter
+        tag_counts = pd.DataFrame(Counter(all_tags).items(), columns=['Tag', 'Count'])
         
-        # Scaling 1-5 metrics to 1-10 for the chart consistency
-        last_entry = df.iloc[-1]
-        values = [
-            last_entry['Mental_State'],
-            last_entry['Didactics'] * 2, # Scale to 10
-            last_entry['Class_Management'] * 2, # Scale to 10
-            last_entry['Energy'],
-            10 - last_entry['Stress'] # Invert stress so "high" is good on the chart
-        ]
-        
-        fig_radar = go.Figure(data=go.Scatterpolar(
-            r=values,
-            theta=categories,
-            fill='toself',
-            name='Latest Class'
-        ))
-        fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), showlegend=False)
-        st.plotly_chart(fig_radar, use_container_width=True)
+        # Bar chart for tags
+        fig_tags = px.bar(tag_counts.sort_values('Count', ascending=True), 
+                          x='Count', y='Tag', orientation='h',
+                          color='Count', color_continuous_scale='Bluered')
+        st.plotly_chart(fig_tags, use_container_width=True)
 
-    # 3. CORRELATION (Heatmap style logic)
-    st.subheader("📊 What affects your teaching?")
-    
-    chart_tab1, chart_tab2 = st.tabs(["Didactics vs Energy", "Recent Notes"])
-    
-    with chart_tab1:
-        fig_scatter = px.scatter(df, x="Energy", y="Didactics", size="Mental_State", 
-                                 color="Class_Group", hover_data=['Notes'],
-                                 title="Does High Energy = Better Teaching?")
-        st.plotly_chart(fig_scatter, use_container_width=True)
+    # 3. Evolution Chart
+    st.subheader("📈 Energy vs Stress")
+    fig_line = px.line(df, x='Date', y=['Energy', 'Stress'], 
+                       markers=True, color_discrete_map={"Energy": "#2ECC71", "Stress": "#E74C3C"})
+    # Move legend to top for mobile visibility
+    fig_line.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+    st.plotly_chart(fig_line, use_container_width=True)
 
-    with chart_tab2:
-        st.dataframe(df[['Date', 'Class_Group', 'Notes']].sort_values(by='Date', ascending=False), use_container_width=True)
+    # 4. Recent Logs
+    with st.expander("📜 Recent Logs History"):
+        display_cols = ['Date', 'Class_Group', 'Tags', 'Notes']
+        st.dataframe(df[display_cols].sort_values(by='Date', ascending=False), use_container_width=True)
 
 else:
-    st.info("👈 No data yet! Use the sidebar to log your first teaching day.")
+    st.info("No classes logged yet. Tap the '+' above!")
