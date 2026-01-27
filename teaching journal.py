@@ -8,11 +8,7 @@ import hashlib
 # -------------------------------------------------
 # CONFIG
 # -------------------------------------------------
-st.set_page_config(
-    page_title="Leerkrachtenmonitor",
-    page_icon="🍎",
-    layout="centered"
-)
+st.set_page_config("Leerkrachtenmonitor", "🍎", layout="centered")
 
 DATA_DIR = "data"
 USERS_FILE = f"{DATA_DIR}/users.csv"
@@ -21,10 +17,10 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # -------------------------------------------------
 # SECURITY
 # -------------------------------------------------
-def hash_pw(pw: str) -> str:
+def hash_pw(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
 
-def check_pw(pw: str, hashed: str) -> bool:
+def check_pw(pw, hashed):
     return hash_pw(pw) == hashed
 
 # -------------------------------------------------
@@ -39,32 +35,43 @@ def save_users(df):
     df.to_csv(USERS_FILE, index=False)
 
 def teacher_file(email):
-    name = email.split("@")[0]
-    return f"{DATA_DIR}/{name}.csv"
+    return f"{DATA_DIR}/{email.split('@')[0]}.csv"
+
+# -------------------------------------------------
+# AUTO LOGIN VIA QUERY PARAM
+# -------------------------------------------------
+params = st.experimental_get_query_params()
+if "user" in params and "user" not in st.session_state:
+    users = load_users()
+    u = users[users.email == params["user"][0]]
+    if not u.empty:
+        st.session_state.user = u.iloc[0].to_dict()
 
 # -------------------------------------------------
 # AUTH
 # -------------------------------------------------
 st.title("🍎 Leerkrachtenmonitor")
-
 users = load_users()
 
 if "user" not in st.session_state:
-    tab_login, tab_reg = st.tabs(["🔐 Inloggen", "🆕 Registreren"])
+    tab1, tab2 = st.tabs(["🔐 Inloggen", "🆕 Registreren"])
 
-    with tab_login:
+    with tab1:
         email = st.text_input("Email", key="login_email")
         pw = st.text_input("Wachtwoord", type="password", key="login_pw")
+        remember = st.checkbox("Onthoud mij")
 
         if st.button("Inloggen"):
             u = users[users.email == email]
             if not u.empty and check_pw(pw, u.iloc[0].password):
                 st.session_state.user = u.iloc[0].to_dict()
+                if remember:
+                    st.experimental_set_query_params(user=email)
                 st.rerun()
             else:
                 st.error("Ongeldige login")
 
-    with tab_reg:
+    with tab2:
         r_email = st.text_input("School-email (@vvx.go-next.be)", key="reg_email")
         r_pw = st.text_input("Wachtwoord", type="password", key="reg_pw")
 
@@ -74,12 +81,12 @@ if "user" not in st.session_state:
             elif r_email in users.email.values:
                 st.error("Account bestaat al")
             elif len(r_pw) < 8:
-                st.error("Wachtwoord moet minstens 8 tekens bevatten")
+                st.error("Minstens 8 tekens")
             else:
                 role = "director" if r_email.startswith("directie") else "teacher"
                 users.loc[len(users)] = [r_email, hash_pw(r_pw), role]
                 save_users(users)
-                st.success("Account succesvol aangemaakt!")
+                st.success("Account aangemaakt!")
 
     st.stop()
 
@@ -87,9 +94,10 @@ if "user" not in st.session_state:
 # SESSION
 # -------------------------------------------------
 user = st.session_state.user
-st.sidebar.success(f"Ingelogd als {user['email']}")
+st.sidebar.success(user["email"])
 
 if st.sidebar.button("Uitloggen"):
+    st.experimental_set_query_params()
     st.session_state.clear()
     st.rerun()
 
@@ -99,81 +107,90 @@ if st.sidebar.button("Uitloggen"):
 if user["role"] == "teacher":
 
     FILE = teacher_file(user["email"])
-
     if not os.path.exists(FILE):
         pd.DataFrame(columns=[
-            "Datum",
-            "Klas",
-            "Mentale helderheid",
-            "Energie",
-            "Stress",
-            "Didactiek",
-            "Klasmanagement"
+            "Datum","Klas","Energie","Stress","Didactiek","Klasmanagement","Positief","Negatief"
         ]).to_csv(FILE, index=False)
 
     df = pd.read_csv(FILE)
 
-    st.header("📝 Les registreren")
+    tab1, tab2, tab3 = st.tabs(["📝 Registratie", "🔥 Vergelijk klassen", "🌡️ Lesmood"])
 
-    with st.form("log_form"):
-        datum = st.date_input("Datum", date.today(), key="log_date")
-        klas = st.selectbox("Klas", ["5MT", "6MT", "5HW", "6WEWI"], key="log_class")
-        m = st.slider("Mentale helderheid", 1, 10, 7, key="log_mental")
-        e = st.slider("Energie", 1, 10, 6, key="log_energy")
-        s = st.slider("Stress", 1, 10, 3, key="log_stress")
-        d = st.selectbox("Didactiek", [1,2,3,4,5], index=2, key="log_did")
-        k = st.selectbox("Klasmanagement", [1,2,3,4,5], index=2, key="log_km")
+    # ---------- REGISTRATIE ----------
+    with tab1:
+        with st.form("log"):
+            d = st.date_input("Datum", date.today())
+            klas = st.selectbox("Klas", ["5MT","6MT","5HW","6WEWI"])
+            e = st.slider("Energie", 1, 10, 6)
+            s = st.slider("Stress", 1, 10, 3)
+            did = st.selectbox("Didactiek", [1,2,3,4,5], index=2)
+            km = st.selectbox("Klasmanagement", [1,2,3,4,5], index=2)
 
-        if st.form_submit_button("💾 Opslaan"):
-            df.loc[len(df)] = [datum, klas, m, e, s, d, k]
-            df.to_csv(FILE, index=False)
-            st.success("Les succesvol opgeslagen")
-            st.rerun()
+            pos = st.multiselect(
+                "Positieve leskenmerken",
+                ["Inspirerend","Motiverend","Actief","Verbondenheid","Respectvol","Gefocust","Humor"]
+            )
 
-    if not df.empty:
-        st.header("📊 Jouw overzicht")
-        fig = px.line(df, x="Datum", y=["Energie", "Stress"], markers=True)
-        st.plotly_chart(fig, use_container_width=True)
+            neg = st.multiselect(
+                "Negatieve leskenmerken",
+                ["Stresserend","Passief","Opstandig","Onrespectvol","Chaotisch","Vermoeiend"]
+            )
+
+            if st.form_submit_button("Opslaan"):
+                df.loc[len(df)] = [
+                    d, klas, e, s, did, km,
+                    ", ".join(pos), ", ".join(neg)
+                ]
+                df.to_csv(FILE, index=False)
+                st.success("Les opgeslagen")
+                st.rerun()
+
+    # ---------- VERGELIJK KLASSEN ----------
+    with tab2:
+        if df.empty:
+            st.info("Nog geen data")
+        else:
+            gemiddelden = (
+                df.groupby("Klas")
+                .mean(numeric_only=True)
+                .reset_index()
+            )
+
+            fig = px.imshow(
+                gemiddelden.set_index("Klas"),
+                color_continuous_scale="GnBu",
+                aspect="auto"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+    # ---------- LESMOOD ----------
+    with tab3:
+        tags = (
+            df["Positief"].str.split(", ").explode().tolist()
+            + df["Negatief"].str.split(", ").explode().tolist()
+        )
+        tags = [t for t in tags if isinstance(t, str) and t != ""]
+        if tags:
+            tag_df = pd.DataFrame(tags, columns=["Mood"])
+            fig = px.histogram(tag_df, y="Mood")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Nog geen mood-data")
 
 # -------------------------------------------------
 # DIRECTOR VIEW
 # -------------------------------------------------
 else:
-    st.header("🏫 Overzicht per klas")
-
+    st.header("🏫 Globaal klasoverzicht")
     all_data = []
 
     for f in os.listdir(DATA_DIR):
         if f.endswith(".csv") and f != "users.csv":
             all_data.append(pd.read_csv(f"{DATA_DIR}/{f}"))
 
-    if not all_data:
-        st.info("Nog geen gegevens beschikbaar")
-        st.stop()
-
-    big = pd.concat(all_data)
-
-    overzicht = (
-        big
-        .groupby("Klas")
-        .mean(numeric_only=True)
-        .round(2)
-        .reset_index()
-    )
-
-    st.dataframe(overzicht, use_container_width=True)
-
-    fig = px.bar(
-        overzicht,
-        x="Klas",
-        y=[
-            "Mentale helderheid",
-            "Energie",
-            "Stress",
-            "Didactiek",
-            "Klasmanagement"
-        ],
-        barmode="group"
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
+    if all_data:
+        big = pd.concat(all_data)
+        overzicht = big.groupby("Klas").mean(numeric_only=True).round(2)
+        st.dataframe(overzicht)
+    else:
+        st.info("Nog geen data beschikbaar")
