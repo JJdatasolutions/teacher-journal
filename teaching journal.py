@@ -12,17 +12,9 @@ FILE_PATH = 'teaching_journal.csv'
 # --- 2. DATA HANDLING ---
 def load_data():
     if not os.path.exists(FILE_PATH):
-        # Create fresh DB with all necessary columns
-        df = pd.DataFrame(columns=[
-            'Date', 'Class_Group', 
-            'Mental_State', 'Energy', 'Stress', 
-            'Didactics', 'Class_Management', 
-            'Tags', 'Notes'
-        ])
+        df = pd.DataFrame(columns=['Date', 'Class_Group', 'Mental_State', 'Energy', 'Stress', 'Didactics', 'Class_Management', 'Tags', 'Notes'])
         df.to_csv(FILE_PATH, index=False)
-    
     df = pd.read_csv(FILE_PATH)
-    # Ensure Date is datetime for sorting/filtering
     df['Date'] = pd.to_datetime(df['Date'])
     return df
 
@@ -31,233 +23,122 @@ def save_data(df):
 
 # --- 3. UI: APP HEADER ---
 st.title("🍎 Teacher's Strava")
-st.caption("Track. Reflect. Improve.")
+df = load_data()
 
-# --- 4. LOGGING FORM (Mobile Friendly) ---
+# --- 4. LOGGING FORM ---
 with st.expander("➕ Log New Session", expanded=False):
     with st.form(key='log_form', clear_on_submit=True):
-        st.subheader("1. The Basics")
         c1, c2 = st.columns(2)
         entry_date = c1.date_input("Date", date.today())
-        # Your specific class list
-        class_options = ['5MT', '6MT', '5HW', '6WEWI', '5ECMT', '5ECWI', '3MT']
-        class_group = c2.selectbox("Class Group", class_options)
+        class_group = c2.selectbox("Class Group", ['5MT', '6MT', '5HW', '6WEWI', '5ECMT', '5ECWI', '3MT'])
         
-        st.markdown("---")
-        st.subheader("2. Vibe Check")
-        # Your specific tags + extras
-        tag_options = [
-            "Respectful", "Energizing", "Inspiring", "Collaborative", "Active", 
-            "Stressful", "Unrespectful", "Rebellious", "Lazy", "Passive",
-            "Chaotic", "Funny", "Focused", "Drained", "Proud"
-        ]
+        tag_options = ["Respectful", "Energizing", "Inspiring", "Collaborative", "Active", "Stressful", "Unrespectful", "Rebellious", "Lazy", "Passive", "Chaotic", "Funny", "Focused", "Drained", "Proud"]
         tags = st.multiselect("Select Tags:", tag_options)
         
-        # Sliders for internal state
         st.write("**Internal State (1-10)**")
         mental = st.slider("🧠 Mental Clarity", 1, 10, 7)
         energy = st.slider("⚡ Energy Level", 1, 10, 6)
         stress = st.slider("😰 Stress Level", 1, 10, 3)
         
-        st.markdown("---")
-        st.subheader("3. Performance")
-        # Dropdowns are easier on mobile than sliders
+        st.write("**Performance (1-5)**")
         col_p1, col_p2 = st.columns(2)
-        didactics = col_p1.selectbox("Didactics", [1, 2, 3, 4, 5], index=2, help="Methodology success")
-        management = col_p2.selectbox("Class Mgmt", [1, 2, 3, 4, 5], index=2, help="Behavior control")
+        didactics = col_p1.selectbox("Didactics", [1, 2, 3, 4, 5], index=2)
+        management = col_p2.selectbox("Class Mgmt", [1, 2, 3, 4, 5], index=2)
         
-        notes = st.text_area("Notes", placeholder="Aha moment? Struggle?")
+        notes = st.text_area("Notes")
         
         if st.form_submit_button("💾 Save Entry", type="primary"):
-            df = load_data()
-            new_entry = {
-                'Date': pd.Timestamp(entry_date),
-                'Class_Group': class_group,
-                'Mental_State': mental,
-                'Energy': energy,
-                'Stress': stress,
-                'Didactics': didactics,
-                'Class_Management': management,
-                'Tags': ", ".join(tags),
-                'Notes': notes
-            }
-            # Append and save
+            new_entry = {'Date': pd.Timestamp(entry_date), 'Class_Group': class_group, 'Mental_State': mental, 'Energy': energy, 'Stress': stress, 'Didactics': didactics, 'Class_Management': management, 'Tags': ", ".join(tags), 'Notes': notes}
             df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
             save_data(df)
             st.success("Session logged!")
             st.rerun()
 
-# --- 5. MAIN DASHBOARD ---
-df = load_data()
-
+# --- 5. DASHBOARD ---
 if not df.empty:
-    # A. TOP METRICS
     st.markdown("---")
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Total Classes", len(df))
-    avg_en = df['Energy'].mean()
-    m2.metric("Avg Energy", f"{avg_en:.1f}")
-    m3.metric("Avg Stress", f"{df['Stress'].mean():.1f}")
-
-    # NEW: VIBE VISUALIZATION (This is what you were missing!)
-    st.subheader("🏷️ Vibe Frequency")
-    # This logic uncurls the list of tags and counts them
-    all_tags = df['Tags'].dropna().str.split(', ').explode()
-    all_tags = all_tags[all_tags != ""] # Remove empty strings
     
-    if not all_tags.empty:
-        tag_counts = all_tags.value_counts().reset_index()
-        tag_counts.columns = ['Vibe', 'Count']
-        
-        # Color the bars: Green-ish for positive vibes, Red-ish for stress
-        fig_vibe = px.bar(
-            tag_counts, 
-            x='Count', 
-            y='Vibe', 
-            orientation='h',
-            color='Count',
-            color_continuous_scale='Viridis',
-            height=300
-        )
-        fig_vibe.update_layout(showlegend=False, margin=dict(l=20, r=20, t=20, b=20))
-        st.plotly_chart(fig_vibe, use_container_width=True)
-    else:
-        st.info("No vibes logged yet.")
+    # NAVIGATION TABS
+    tab1, tab2, tab3, tab4 = st.tabs(["🔥 Activity", "⚔️ Compare Classes", "🔍 Search", "📧 Report"])
 
-    # --- B. TABS FOR FUNCTIONALITY ---
-    # (Rest of the tabs code stays the same...)
-    tab1, tab2, tab3, tab4 = st.tabs(["🔥 Activity", "⚔️ Compare", "🔍 Search", "📧 Report"])
-
-    # TAB 1: STRAVA-STYLE HEATMAP
+    # TAB 1: OVERALL ACTIVITY
     with tab1:
-        st.subheader("Consistency Log")
-        # Create a heatmap: Week of Year vs Day of Week
-        df['Week'] = df['Date'].dt.isocalendar().week
-        df['Day'] = df['Date'].dt.day_name()
+        st.subheader("Global Vibe Frequency")
+        all_tags = df['Tags'].dropna().str.split(', ').explode()
+        all_tags = all_tags[all_tags != ""]
+        if not all_tags.empty:
+            tag_counts = all_tags.value_counts().reset_index().head(10)
+            tag_counts.columns = ['Vibe', 'Count']
+            fig_vibe = px.bar(tag_counts, x='Count', y='Vibe', orientation='h', color='Count', color_continuous_scale='Viridis', height=300)
+            st.plotly_chart(fig_vibe, use_container_width=True)
         
-        # Aggregate logic: If multiple classes in one day, take average Energy
-        heatmap_data = df.groupby(['Week', 'Day'])['Energy'].mean().reset_index()
-        
-        # Ensure correct day order
-        days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        
-        fig_heat = px.density_heatmap(
-            heatmap_data, x="Week", y="Day", z="Energy", 
-            nbinsx=52, category_orders={"Day": days_order},
-            color_continuous_scale="Greens", title="Energy Heatmap (Darker = Higher Energy)"
-        )
-        st.plotly_chart(fig_heat, use_container_width=True)
+        st.subheader("Energy Over Time")
+        fig_line = px.line(df.sort_values('Date'), x='Date', y=['Energy', 'Stress'], markers=True)
+        st.plotly_chart(fig_line, use_container_width=True)
 
-    # TAB 2: CLASS VS CLASS COMPARISON
+    # TAB 2: CLASS VS CLASS COMPARISON (Vibe Visuals Added Here!)
     with tab2:
         st.subheader("Class Showdown")
-        c_opts = df['Class_Group'].unique()
+        c_opts = sorted(df['Class_Group'].unique())
         if len(c_opts) < 2:
-            st.warning("Log at least two different classes to compare them!")
+            st.warning("Log entries for at least two different classes to see a comparison.")
         else:
             col_a, col_b = st.columns(2)
-            class_a = col_a.selectbox("Class A", c_opts, index=0)
-            class_b = col_b.selectbox("Class B", c_opts, index=1 if len(c_opts)>1 else 0)
+            class_a = col_a.selectbox("Select Class A", c_opts, index=0)
+            class_b = col_b.selectbox("Select Class B", c_opts, index=1)
             
-            # Filter Data
             df_a = df[df['Class_Group'] == class_a]
             df_b = df[df['Class_Group'] == class_b]
-            
-            # Categories to compare
-            categories = ['Mental Clarity', 'Energy', 'Didactics (x2)', 'Mgmt (x2)', 'Calmness (Inv. Stress)']
-            
+
+            # 1. RADAR CHART
+            categories = ['Mental', 'Energy', 'Didactics (x2)', 'Mgmt (x2)', 'Calm (10-Stress)']
             def get_stats(sub_df):
-                if sub_df.empty: return [0]*5
-                return [
-                    sub_df['Mental_State'].mean(),
-                    sub_df['Energy'].mean(),
-                    sub_df['Didactics'].mean() * 2, # Scale to 10
-                    sub_df['Class_Management'].mean() * 2, # Scale to 10
-                    10 - sub_df['Stress'].mean() # Invert stress
-                ]
+                return [sub_df['Mental_State'].mean(), sub_df['Energy'].mean(), sub_df['Didactics'].mean()*2, sub_df['Class_Management'].mean()*2, 10-sub_df['Stress'].mean()]
             
             fig_radar = go.Figure()
             fig_radar.add_trace(go.Scatterpolar(r=get_stats(df_a), theta=categories, fill='toself', name=class_a))
             fig_radar.add_trace(go.Scatterpolar(r=get_stats(df_b), theta=categories, fill='toself', name=class_b))
-            fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), showlegend=True)
+            fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), height=400)
             st.plotly_chart(fig_radar, use_container_width=True)
 
-    # TAB 3: AHA MOMENT SEARCH
-    with tab3:
-        st.subheader("Find Past Notes")
-        search_term = st.text_input("Search keywords (e.g., 'grammar', 'noisy', 'test')")
-        
-        if search_term:
-            # Filter notes containing the term (case insensitive)
-            mask = df['Notes'].str.contains(search_term, case=False, na=False)
-            results = df[mask][['Date', 'Class_Group', 'Notes']]
-            if not results.empty:
-                st.dataframe(results, hide_index=True, use_container_width=True)
-            else:
-                st.info("No notes found with that keyword.")
-        else:
-            # Show recent notes
-            st.write("Recent Notes:")
-            st.dataframe(df[['Date', 'Class_Group', 'Notes']].tail(5).sort_values(by='Date', ascending=False), hide_index=True)
-
-    # TAB 4: WEEKLY REPORT GENERATOR
-    with tab4:
-        st.subheader("Weekly Recap")
-        st.write("Generate a summary to email to yourself.")
-        
-        if st.button("Generate Report"):
-            # Filter last 7 days
-            end_date = df['Date'].max()
-            start_date = end_date - timedelta(days=7)
-            mask = (df['Date'] >= start_date) & (df['Date'] <= end_date)
-            weekly_df = df[mask]
+            # 2. VIBE COMPARISON (The missing piece!)
+            st.write(f"**Vibe Comparison: {class_a} vs {class_b}**")
             
-            if not weekly_df.empty:
-                total_classes = len(weekly_df)
-                avg_stress_w = weekly_df['Stress'].mean()
-                best_class = weekly_df.loc[weekly_df['Didactics'].idxmax()]['Class_Group']
-                
-                report_text = f"""
-Subject: Teaching Reflection: {start_date.date()} to {end_date.date()}
+            def get_tag_df(sub_df, label):
+                tags = sub_df['Tags'].dropna().str.split(', ').explode()
+                tags = tags[tags != ""]
+                counts = tags.value_counts().reset_index()
+                counts.columns = ['Vibe', 'Count']
+                counts['Class'] = label
+                return counts
 
-SUMMARY:
-- Total Classes: {total_classes}
-- Average Stress: {avg_stress_w:.1f}/10
-- Highlight: Best session was with {best_class}
+            tags_a = get_tag_df(df_a, class_a)
+            tags_b = get_tag_df(df_b, class_b)
+            combined_tags = pd.concat([tags_a, tags_b])
 
-REFLECTIONS:
-{weekly_df[['Date', 'Class_Group', 'Notes']].to_string(index=False)}
-                """
-                st.text_area("Copy this draft:", report_text, height=250)
-                st.caption(f"Tip: Send this to ambrasdata@gmail.com")
-            else:
-                st.warning("No logs found in the last 7 days of data.")
+            if not combined_tags.empty:
+                fig_compare_vibe = px.bar(combined_tags, x='Vibe', y='Count', color='Class', barmode='group', height=350)
+                st.plotly_chart(fig_compare_vibe, use_container_width=True)
 
-    # --- 6. DATA MANAGEMENT (Footer) ---
-    st.markdown("---")
-    with st.expander("⚙️ Manage Data (Edit / Delete / Download)"):
-        # 1. Download
-        csv_data = df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Download Full CSV",
-            data=csv_data,
-            file_name='teaching_journal_backup.csv',
-            mime='text/csv'
-        )
-        
-        # 2. Edit/Delete
-        st.write("Edit values below. To delete, select rows on the left and press Delete.")
-        edited_df = st.data_editor(
-            df.sort_values(by='Date', ascending=False), 
-            num_rows="dynamic", 
-            use_container_width=True
-        )
-        
-        if st.button("⚠️ Confirm Changes"):
-            save_data(edited_df)
-            st.success("Database updated successfully.")
+    # TAB 3 & 4 (Notes Search & Report)
+    with tab3:
+        search = st.text_input("🔍 Search your notes...")
+        if search:
+            results = df[df['Notes'].str.contains(search, case=False, na=False)]
+            st.dataframe(results[['Date', 'Class_Group', 'Notes']], use_container_width=True, hide_index=True)
+
+    with tab4:
+        if st.button("Generate Weekly Report"):
+            last_week = df[df['Date'] > (pd.Timestamp.now() - timedelta(days=7))]
+            st.text_area("Draft for ambrasdata@gmail.com:", f"Weekly Summary\nAvg Stress: {last_week['Stress'].mean():.1f}\n\nNotes:\n{last_week['Notes'].str.cat(sep=' | ')}", height=200)
+
+    # DATA MANAGEMENT
+    with st.expander("⚙️ Manage Data"):
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Download CSV", data=csv, file_name='teaching_log.csv', mime='text/csv')
+        edited = st.data_editor(df, num_rows="dynamic")
+        if st.button("Save Changes"):
+            save_data(edited)
             st.rerun()
-
 else:
-    st.info("👈 Tap 'Log New Session' to start your first entry!")
-
+    st.info("Log your first class to see the dashboard!")
