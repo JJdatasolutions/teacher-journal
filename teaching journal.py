@@ -125,15 +125,13 @@ if user["role"] == "teacher":
 
     if not os.path.exists(DAY_FILE):
         pd.DataFrame(columns=["Datum", "Energie", "Stress"]).to_csv(DAY_FILE, index=False)
-
     if not os.path.exists(LES_FILE):
-        pd.DataFrame(columns=[
-            "Datum", "Klas", "Lesaanpak", "Klasmanagement", "Positief", "Negatief"
-        ]).to_csv(LES_FILE, index=False)
+        pd.DataFrame(columns=["Datum", "Klas", "Lesaanpak", "Klasmanagement", "Positief", "Negatief"]).to_csv(LES_FILE, index=False)
 
     day_df = pd.read_csv(DAY_FILE, parse_dates=["Datum"])
     les_df = pd.read_csv(LES_FILE, parse_dates=["Datum"])
 
+    # ---- tabs staan nu binnen de teacher if ----
     tab1, tab2, tab3, tab4 = st.tabs([
         "🧠 Daggevoel",
         "📝 Lesregistratie",
@@ -142,50 +140,19 @@ if user["role"] == "teacher":
     ])
 
     # -------- DAGREGISTRATIE --------
-    # -------- DAGREGISTRATIE --------
-with tab1:
-    with st.form("day_log"):
-        d = st.date_input("Datum", date.today())
-        
-        energie = st.slider(
-            "Energie",
-            1, 5, 3,
-            help="1 = Uitgeput · 5 = Zeer energiek",
-            key="energie_slider"
-        )
-        c1, c2, c3, c4, c5 = st.columns(5)
-        c1.caption("Uitgeput")
-        c2.caption("Weinig energie")
-        c3.caption("Oké")
-        c4.caption("Veel energie")
-        c5.caption("Zeer energiek")
+    with tab1:
+        with st.form("day_log"):
+            d = st.date_input("Datum", date.today())
+            energie = st.slider("Energie", 1, 5, 3, help="1 = Uitgeput · 5 = Zeer energiek", key="energie_slider")
+            stress = st.slider("Stress", 1, 5, 3, help="1 = Rustig · 5 = Enorm gestresseerd", key="stress_slider")
 
-        stress = st.slider(
-            "Stress",
-            1, 5, 3,
-            help="1 = Rustig · 5 = Enorm gestresseerd",
-            key="stress_slider"
-        )
-        s1, s2, s3, s4, s5 = st.columns(5)
-        s1.caption("Rustig")
-        s2.caption("Licht gespannen")
-        s3.caption("Gemiddeld")
-        s4.caption("Erg gestresseerd")
-        s5.caption("Enorm gestresseerd")
-
-        # ✅ Submit button binnen het form-block
-        if st.form_submit_button("Opslaan"):
-            day_df.loc[len(day_df)] = [
-                d, st.session_state.energie_slider, st.session_state.stress_slider
-            ]
-            day_df.to_csv(DAY_FILE, index=False)
-            st.success("Geregistreerd!")
-            # sliders resetten
-            st.session_state.energie_slider = 3
-            st.session_state.stress_slider = 3
-            st.rerun()
-
-
+            if st.form_submit_button("Opslaan"):
+                day_df.loc[len(day_df)] = [d, st.session_state.energie_slider, st.session_state.stress_slider]
+                day_df.to_csv(DAY_FILE, index=False)
+                st.success("Geregistreerd!")
+                st.session_state.energie_slider = 3
+                st.session_state.stress_slider = 3
+                st.rerun()
     if not day_df.empty:
         fig = px.line(
             day_df.sort_values("Datum"),
@@ -323,6 +290,7 @@ else:
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Nog geen data van leerkrachten beschikbaar.")
+
 
 
 
