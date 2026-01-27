@@ -143,34 +143,34 @@ if user["role"] == "teacher":
 
     # -------- DAGREGISTRATIE --------
     with tab1:
-    with st.form("day_log"):
-        d = st.date_input("Datum", date.today())
+        with st.form("day_log"):
+            d = st.date_input("Datum", date.today())
 
-        energie = st.slider(
-            "Energie",
-            1, 5, 3,
-            help="1 = Uitgeput · 5 = Zeer energiek",
-            key="energie_slider"
-        )
-        c1, c2, c3, c4, c5 = st.columns(5)
-        c1.caption("Uitgeput")
-        c2.caption("Weinig energie")
-        c3.caption("Oké")
-        c4.caption("Veel energie")
-        c5.caption("Zeer energiek")
+            energie = st.slider(
+                "Energie",
+                1, 5, 3,
+                help="1 = Uitgeput · 5 = Zeer energiek",
+                key="energie_slider"
+            )
+            c1, c2, c3, c4, c5 = st.columns(5)
+            c1.caption("Uitgeput")
+            c2.caption("Weinig energie")
+            c3.caption("Oké")
+            c4.caption("Veel energie")
+            c5.caption("Zeer energiek")
 
-        stress = st.slider(
-            "Stress",
-            1, 5, 3,
-            help="1 = Rustig · 5 = Enorm gestresseerd",
-            key="stress_slider"
-        )
-        s1, s2, s3, s4, s5 = st.columns(5)
-        s1.caption("Rustig")
-        s2.caption("Licht gespannen")
-        s3.caption("Gemiddeld")
-        s4.caption("Erg gestresseerd")
-        s5.caption("Enorm gestresseerd")
+            stress = st.slider(
+                "Stress",
+                1, 5, 3,
+                help="1 = Rustig · 5 = Enorm gestresseerd",
+                key="stress_slider"
+            )
+            s1, s2, s3, s4, s5 = st.columns(5)
+            s1.caption("Rustig")
+            s2.caption("Licht gespannen")
+            s3.caption("Gemiddeld")
+            s4.caption("Erg gestresseerd")
+            s5.caption("Enorm gestresseerd")
 
         if st.form_submit_button("Opslaan"):
             day_df.loc[len(day_df)] = [d, st.session_state.energie_slider, st.session_state.stress_slider]
@@ -318,4 +318,5 @@ else:
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Nog geen data van leerkrachten beschikbaar.")
+
 
