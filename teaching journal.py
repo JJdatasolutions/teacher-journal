@@ -56,7 +56,7 @@ if "user" in params and "user" not in st.session_state:
 # -------------------------------------------------
 # AUTH
 # -------------------------------------------------
-st.title("🍎 Leerkrachtenmonitor")
+st.title("❤️ Leerkrachtenmonitor")
 users = load_users()
 
 if "user" not in st.session_state:
@@ -291,6 +291,7 @@ else:
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Nog geen data van leerkrachten beschikbaar.")
+
 
 
 
