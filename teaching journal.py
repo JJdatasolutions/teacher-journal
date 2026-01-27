@@ -64,7 +64,7 @@ if "user" not in st.session_state:
 
     with tab1:
         email = normalize_email(st.text_input("Email"))
-        pw = st.text_input("Wachtwoord", type="password")
+        pw = st.text_input("Wachtwoord", type="password", key="login_pw")
         remember = st.checkbox("Onthoud mij")
 
         if st.button("Inloggen"):
@@ -79,7 +79,7 @@ if "user" not in st.session_state:
 
     with tab2:
         r_email = normalize_email(st.text_input("School-email"))
-        r_pw = st.text_input("Wachtwoord", type="password")
+        r_pw = st.text_input("Wachtwoord", type="password", key="reg_pw")
 
         if st.button("Account aanmaken"):
             if r_email in users.email.values:
@@ -283,3 +283,4 @@ else:
             title="Gemiddelde energie & stress (schoolbreed)"
         )
         st.plotly_chart(fig, use_container_width=True)
+
