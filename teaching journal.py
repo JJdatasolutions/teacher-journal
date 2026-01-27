@@ -165,17 +165,26 @@ if user["role"] == "teacher":
 
     # ---------- LESMOOD ----------
     with tab3:
-        tags = (
-            df["Positief"].str.split(", ").explode().tolist()
-            + df["Negatief"].str.split(", ").explode().tolist()
-        )
-        tags = [t for t in tags if isinstance(t, str) and t != ""]
-        if tags:
-            tag_df = pd.DataFrame(tags, columns=["Mood"])
-            fig = px.histogram(tag_df, y="Mood")
-            st.plotly_chart(fig, use_container_width=True)
-        else:
+    if df.empty:
+        st.info("Nog geen mood-data")
+    else:
+        pos = df["Positief"].fillna("").astype(str).str.split(", ").explode()
+        neg = df["Negatief"].fillna("").astype(str).str.split(", ").explode()
+
+        tags = list(pos) + list(neg)
+        tags = [t for t in tags if t != ""]
+
+        if not tags:
             st.info("Nog geen mood-data")
+        else:
+            tag_df = pd.DataFrame(tags, columns=["Lesmood"])
+            fig = px.histogram(
+                tag_df,
+                y="Lesmood",
+                title="Frequentie van lesmoods"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
 
 # -------------------------------------------------
 # DIRECTOR VIEW
@@ -194,3 +203,4 @@ else:
         st.dataframe(overzicht)
     else:
         st.info("Nog geen data beschikbaar")
+
