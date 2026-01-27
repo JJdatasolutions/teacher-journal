@@ -63,20 +63,11 @@ if not df.empty:
 
     # TAB 1: OVERALL ACTIVITY
     with tab1:
-        st.subheader("Global Vibe Frequency")
-        all_tags = df['Tags'].dropna().str.split(', ').explode()
-        all_tags = all_tags[all_tags != ""]
-        if not all_tags.empty:
-            tag_counts = all_tags.value_counts().reset_index().head(10)
-            tag_counts.columns = ['Vibe', 'Count']
-            fig_vibe = px.bar(tag_counts, x='Count', y='Vibe', orientation='h', color='Count', color_continuous_scale='Viridis', height=300)
-            st.plotly_chart(fig_vibe, use_container_width=True)
-        
-        st.subheader("Energy Over Time")
-        fig_line = px.line(df.sort_values('Date'), x='Date', y=['Energy', 'Stress'], markers=True)
+        st.subheader("Global Performance")
+        fig_line = px.line(df.sort_values('Date'), x='Date', y=['Energy', 'Stress'], markers=True, color_discrete_map={"Energy": "#2ECC71", "Stress": "#E74C3C"})
         st.plotly_chart(fig_line, use_container_width=True)
 
-    # TAB 2: CLASS VS CLASS COMPARISON (Vibe Visuals Added Here!)
+    # TAB 2: CLASS VS CLASS COMPARISON (HEATMAPS ADDED HERE)
     with tab2:
         st.subheader("Class Showdown")
         c_opts = sorted(df['Class_Group'].unique())
@@ -90,7 +81,7 @@ if not df.empty:
             df_a = df[df['Class_Group'] == class_a]
             df_b = df[df['Class_Group'] == class_b]
 
-            # 1. RADAR CHART
+            # RADAR CHART
             categories = ['Mental', 'Energy', 'Didactics (x2)', 'Mgmt (x2)', 'Calm (10-Stress)']
             def get_stats(sub_df):
                 return [sub_df['Mental_State'].mean(), sub_df['Energy'].mean(), sub_df['Didactics'].mean()*2, sub_df['Class_Management'].mean()*2, 10-sub_df['Stress'].mean()]
@@ -98,27 +89,35 @@ if not df.empty:
             fig_radar = go.Figure()
             fig_radar.add_trace(go.Scatterpolar(r=get_stats(df_a), theta=categories, fill='toself', name=class_a))
             fig_radar.add_trace(go.Scatterpolar(r=get_stats(df_b), theta=categories, fill='toself', name=class_b))
-            fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), height=400)
+            fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 10])), height=350, margin=dict(t=30, b=30))
             st.plotly_chart(fig_radar, use_container_width=True)
 
-            # 2. VIBE COMPARISON (The missing piece!)
-            st.write(f"**Vibe Comparison: {class_a} vs {class_b}**")
-            
-            def get_tag_df(sub_df, label):
+            # VIBE HEATMAPS
+            st.markdown("### 🌡️ Vibe Heatmaps")
+            st.caption("Darker color = Vibe occurs more frequently in this class.")
+
+            def get_vibe_heatmap(sub_df, class_name):
                 tags = sub_df['Tags'].dropna().str.split(', ').explode()
                 tags = tags[tags != ""]
+                if tags.empty:
+                    return None
                 counts = tags.value_counts().reset_index()
-                counts.columns = ['Vibe', 'Count']
-                counts['Class'] = label
-                return counts
+                counts.columns = ['Vibe', 'Frequency']
+                # Create horizontal bar colored by frequency (mimicking heatmap behavior)
+                fig = px.bar(counts.sort_values('Frequency'), 
+                             x='Frequency', y='Vibe', 
+                             title=f"Vibe Intensity: {class_name}",
+                             orientation='h',
+                             color='Frequency', 
+                             color_continuous_scale='GnBu')
+                fig.update_layout(coloraxis_showscale=False, height=300, margin=dict(l=0, r=0, t=40, b=0))
+                return fig
 
-            tags_a = get_tag_df(df_a, class_a)
-            tags_b = get_tag_df(df_b, class_b)
-            combined_tags = pd.concat([tags_a, tags_b])
+            fig_h_a = get_vibe_heatmap(df_a, class_a)
+            fig_h_b = get_vibe_heatmap(df_b, class_b)
 
-            if not combined_tags.empty:
-                fig_compare_vibe = px.bar(combined_tags, x='Vibe', y='Count', color='Class', barmode='group', height=350)
-                st.plotly_chart(fig_compare_vibe, use_container_width=True)
+            if fig_h_a: st.plotly_chart(fig_h_a, use_container_width=True)
+            if fig_h_b: st.plotly_chart(fig_h_b, use_container_width=True)
 
     # TAB 3 & 4 (Notes Search & Report)
     with tab3:
@@ -130,15 +129,19 @@ if not df.empty:
     with tab4:
         if st.button("Generate Weekly Report"):
             last_week = df[df['Date'] > (pd.Timestamp.now() - timedelta(days=7))]
-            st.text_area("Draft for ambrasdata@gmail.com:", f"Weekly Summary\nAvg Stress: {last_week['Stress'].mean():.1f}\n\nNotes:\n{last_week['Notes'].str.cat(sep=' | ')}", height=200)
+            report = f"Weekly Summary for ambrasdata@gmail.com\n\nAvg Energy: {last_week['Energy'].mean():.1f}\nAvg Stress: {last_week['Stress'].mean():.1f}\n\nNotes Log:\n"
+            for _, row in last_week.iterrows():
+                report += f"- {row['Date'].date()} ({row['Class_Group']}): {row['Notes']}\n"
+            st.text_area("Copy and Send:", report, height=250)
 
     # DATA MANAGEMENT
-    with st.expander("⚙️ Manage Data"):
+    with st.expander("⚙️ Settings"):
         csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download CSV", data=csv, file_name='teaching_log.csv', mime='text/csv')
-        edited = st.data_editor(df, num_rows="dynamic")
-        if st.button("Save Changes"):
+        st.download_button("📥 Backup to CSV", data=csv, file_name='teaching_log.csv', mime='text/csv')
+        edited = st.data_editor(df.sort_values('Date', ascending=False), num_rows="dynamic")
+        if st.button("Save Database Changes"):
             save_data(edited)
+            st.success("Changes Saved!")
             st.rerun()
 else:
     st.info("Log your first class to see the dashboard!")
