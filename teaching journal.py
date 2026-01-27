@@ -230,57 +230,64 @@ if user["role"] == "teacher":
             st.plotly_chart(fig2, use_container_width=True)
 
     # -------- PDF EXPORT --------
+    # -------- PDF EXPORT (Aangepast voor lege data) --------
     with tab4:
-        maand = st.selectbox(
-            "Maand",
-            sorted(day_df["Datum"].dt.to_period("M").astype(str).unique())
-        )
+        if day_df.empty:
+            st.info("Vul eerst daggegevens in bij 'Daggevoel' om een PDF te kunnen genereren.")
+        else:
+            # We maken een lijst van maanden die aanwezig zijn in de data
+            beschikbare_maanden = sorted(day_df["Datum"].dt.to_period("M").astype(str).unique())
+            
+            maand = st.selectbox("Selecteer Maand", beschikbare_maanden)
 
-        if st.button("Genereer PDF"):
-            pdf_file = f"{DATA_DIR}/{user['email'].split('@')[0]}_{maand}.pdf"
-            doc = SimpleDocTemplate(pdf_file)
-            styles = getSampleStyleSheet()
-            story = []
+            if st.button("Genereer PDF"):
+                pdf_file = f"{DATA_DIR}/{user['email'].split('@')[0]}_{maand}.pdf"
+                doc = SimpleDocTemplate(pdf_file)
+                styles = getSampleStyleSheet()
+                story = []
 
-            story.append(Paragraph(f"<b>Maandoverzicht {maand}</b>", styles["Title"]))
+                story.append(Paragraph(f"<b>Maandoverzicht {maand}</b>", styles["Title"]))
 
-            subset = day_df[day_df["Datum"].dt.to_period("M").astype(str) == maand]
-            avg_e = subset["Energie"].mean()
-            avg_s = subset["Stress"].mean()
+                subset = day_df[day_df["Datum"].dt.to_period("M").astype(str) == maand]
+                avg_e = subset["Energie"].mean()
+                avg_s = subset["Stress"].mean()
 
-            story.append(Paragraph(
-                f"Gemiddelde energie: {avg_e:.2f}<br/>Gemiddelde stress: {avg_s:.2f}",
-                styles["Normal"]
-            ))
+                story.append(Paragraph(
+                    f"Gemiddelde energie: {avg_e:.2f}<br/>Gemiddelde stress: {avg_s:.2f}",
+                    styles["Normal"]
+                ))
 
-            doc.build(story)
-            st.success("PDF gegenereerd")
-            st.download_button("Download PDF", open(pdf_file, "rb"), file_name=pdf_file)
+                doc.build(story)
+                with open(pdf_file, "rb") as f:
+                    st.download_button("Download PDF", f, file_name=f"Rapport_{maand}.pdf")
+                st.success("PDF gereed!")
 
 # -------------------------------------------------
-# DIRECTOR VIEW
+# DIRECTOR VIEW (Gecorrigeerd)
 # -------------------------------------------------
 else:
     st.header("🏫 Directie-overzicht")
 
     day_logs = []
-    lesson_logs = []
-
     for f in os.listdir(DATA_DIR):
         if f.endswith("_day.csv"):
-            day_logs.append(pd.read_csv(os.path.join(DATA_DIR, f), parse_dates=["Datum"]))
-        if f.endswith("_lessons.csv"):
-            lesson_logs.append(pd.read_csv(os.path.join(DATA_DIR, f), parse_dates=["Datum"]))
+            path = os.path.join(DATA_DIR, f)
+            temp_df = pd.read_csv(path, parse_dates=["Datum"])
+            if not temp_df.empty:
+                day_logs.append(temp_df)
 
     if day_logs:
         big_day = pd.concat(day_logs)
-        avg_day = big_day.groupby("Datum").mean().reset_index()
+        # numeric_only=True is verplicht om crashes te voorkomen bij het middelen
+        avg_day = big_day.groupby("Datum").mean(numeric_only=True).reset_index()
 
         fig = px.line(
             avg_day,
             x="Datum",
             y=["Energie", "Stress"],
-            title="Gemiddelde energie & stress (schoolbreed)"
+            title="Gemiddelde energie & stress (schoolbreed)",
+            color_discrete_map={"Energie": "#2ECC71", "Stress": "#E74C3C"}
         )
         st.plotly_chart(fig, use_container_width=True)
-
+    else:
+        st.info("Nog geen data van leerkrachten beschikbaar.")
