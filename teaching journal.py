@@ -165,9 +165,9 @@ if user["role"] == "teacher":
 
     # ---------- LESMOOD ----------
     with tab3:
-    if df.empty:
+        if df.empty:
         st.info("Nog geen mood-data")
-    else:
+        else:
         pos = df["Positief"].fillna("").astype(str).str.split(", ").explode()
         neg = df["Negatief"].fillna("").astype(str).str.split(", ").explode()
 
@@ -203,4 +203,5 @@ else:
         st.dataframe(overzicht)
     else:
         st.info("Nog geen data beschikbaar")
+
 
