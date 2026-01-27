@@ -4,7 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import date
 import os
-import bcrypt
+import hashlib
 
 # ---------------- CONFIG ----------------
 st.set_page_config(page_title="Leerkrachtenmonitor", page_icon="🍎")
@@ -14,11 +14,11 @@ USERS_FILE = f"{DATA_DIR}/users.csv"
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # ---------------- HELPERS ----------------
-def hash_pw(pw):
-    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+def hash_pw(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
 
-def check_pw(pw, hashed):
-    return bcrypt.checkpw(pw.encode(), hashed.encode())
+def check_pw(password: str, hashed: str) -> bool:
+    return hash_pw(password) == hashed
 
 def load_users():
     if not os.path.exists(USERS_FILE):
@@ -133,3 +133,4 @@ else:
         barmode="group"
     )
     st.plotly_chart(fig, use_container_width=True)
+
