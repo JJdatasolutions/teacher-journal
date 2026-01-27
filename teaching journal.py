@@ -201,16 +201,41 @@ else:
     st.header("🏫 Globaal klasoverzicht")
     all_data = []
 
-    for f in os.listdir(DATA_DIR):
-        if f.endswith(".csv") and f != "users.csv":
-            all_data.append(pd.read_csv(f"{DATA_DIR}/{f}"))
+    files = [f for f in os.listdir(DATA_DIR) if f.endswith(".csv") and f != "users.csv"]
+    
+    for f in files:
+        df_temp = pd.read_csv(f"{DATA_DIR}/{f}")
+        if not df_temp.empty:
+            all_data.append(df_temp)
 
     if all_data:
-        big = pd.concat(all_data)
+        big = pd.concat(all_data, ignore_index=True)
+        
+        # Groeperen en gemiddelde berekenen
         overzicht = big.groupby("Klas").mean(numeric_only=True).round(2)
-        st.dataframe(overzicht)
+
+        # Weergave opties
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.subheader("Cijfers")
+            st.dataframe(overzicht, use_container_width=True)
+            
+        with col2:
+            st.subheader("Visuele Trends")
+            # Een heatmap werkt fantastisch voor directie-overzichten
+            import plotly.express as px
+            fig = px.imshow(
+                overzicht.T, 
+                text_auto=True, 
+                aspect="auto",
+                color_continuous_scale="RdYlGn", # Rood naar Groen
+                title="Sterktes en zwaktes per klas"
+            )
+            st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("Nog geen data beschikbaar")
+        st.info("Nog geen data beschikbaar om een overzicht te genereren.")
+
 
 
 
