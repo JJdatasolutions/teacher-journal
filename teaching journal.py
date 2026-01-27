@@ -40,10 +40,10 @@ def teacher_file(email):
 # -------------------------------------------------
 # AUTO LOGIN VIA QUERY PARAM
 # -------------------------------------------------
-params = st.experimental_get_query_params()
+params = st.query_params
 if "user" in params and "user" not in st.session_state:
     users = load_users()
-    u = users[users.email == params["user"][0]]
+    u = users[users.email == params["user"]]
     if not u.empty:
         st.session_state.user = u.iloc[0].to_dict()
 
@@ -66,7 +66,7 @@ if "user" not in st.session_state:
             if not u.empty and check_pw(pw, u.iloc[0].password):
                 st.session_state.user = u.iloc[0].to_dict()
                 if remember:
-                    st.experimental_set_query_params(user=email)
+                    st.query_params["user"] = email
                 st.rerun()
             else:
                 st.error("Ongeldige login")
@@ -87,25 +87,23 @@ if "user" not in st.session_state:
                 users.loc[len(users)] = [r_email, hash_pw(r_pw), role]
                 save_users(users)
                 st.success("Account aangemaakt!")
-
     st.stop()
 
 # -------------------------------------------------
 # SESSION
 # -------------------------------------------------
 user = st.session_state.user
-st.sidebar.success(user["email"])
+st.sidebar.success(f"Ingelogd als: {user['email']}")
 
 if st.sidebar.button("Uitloggen"):
-    st.experimental_set_query_params()
+    st.query_params.clear()
     st.session_state.clear()
     st.rerun()
 
 # -------------------------------------------------
-# TEACHER VIEW
+# MAIN LOGIC (TEACHER vs DIRECTOR)
 # -------------------------------------------------
 if user["role"] == "teacher":
-
     FILE = teacher_file(user["email"])
     if not os.path.exists(FILE):
         pd.DataFrame(columns=[
@@ -116,7 +114,6 @@ if user["role"] == "teacher":
 
     tab1, tab2, tab3 = st.tabs(["📝 Registratie", "🔥 Vergelijk klassen", "🌡️ Lesmood"])
 
-    # ---------- REGISTRATIE ----------
     with tab1:
         with st.form("log"):
             d = st.date_input("Datum", date.today())
@@ -126,77 +123,61 @@ if user["role"] == "teacher":
             did = st.selectbox("Didactiek", [1,2,3,4,5], index=2)
             km = st.selectbox("Klasmanagement", [1,2,3,4,5], index=2)
 
-            pos = st.multiselect(
+            pos_tags = st.multiselect(
                 "Positieve leskenmerken",
                 ["Inspirerend","Motiverend","Actief","Verbondenheid","Respectvol","Gefocust","Humor"]
             )
 
-            neg = st.multiselect(
+            neg_tags = st.multiselect(
                 "Negatieve leskenmerken",
                 ["Stresserend","Passief","Opstandig","Onrespectvol","Chaotisch","Vermoeiend"]
             )
 
             if st.form_submit_button("Opslaan"):
-                df.loc[len(df)] = [
+                new_data = pd.DataFrame([[
                     d, klas, e, s, did, km,
-                    ", ".join(pos), ", ".join(neg)
-                ]
+                    ", ".join(pos_tags), ", ".join(neg_tags)
+                ]], columns=df.columns)
+                df = pd.concat([df, new_data], ignore_index=True)
                 df.to_csv(FILE, index=False)
                 st.success("Les opgeslagen")
                 st.rerun()
 
-    # ---------- VERGELIJK KLASSEN ----------
     with tab2:
         if df.empty:
             st.info("Nog geen data")
         else:
-            gemiddelden = (
-                df.groupby("Klas")
-                .mean(numeric_only=True)
-                .reset_index()
-            )
-
+            gemiddelden = df.groupby("Klas").mean(numeric_only=True).reset_index()
             fig = px.imshow(
                 gemiddelden.set_index("Klas"),
                 color_continuous_scale="GnBu",
-                aspect="auto"
+                aspect="auto",
+                title="Gemiddelde scores per klas"
             )
             st.plotly_chart(fig, use_container_width=True)
 
-    # ---------- LESMOOD ----------
-with tab3:
-    if df.empty:
-        st.info("Nog geen mood-data")
-    else:
-        # Splits de tags en maak er een platte lijst van
-        pos = df["Positief"].fillna("").astype(str).str.split(", ").explode()
-        neg = df["Negatief"].fillna("").astype(str).str.split(", ").explode()
-
-        # Filter lege strings weg
-        tags = [t for t in list(pos) + list(neg) if t != ""]
-
-        if not tags:
+    with tab3:
+        if df.empty:
             st.info("Nog geen mood-data")
         else:
-            tag_df = pd.DataFrame(tags, columns=["Lesmood"])
-            
-            # Sorteer op frequentie voor een cleaner overzicht
-            fig = px.histogram(
-                tag_df,
-                y="Lesmood",
-                title="Frequentie van lesmoods",
-                category_orders={"Lesmood": tag_df["Lesmood"].value_counts().index.tolist()}
-            )
-            
-            # Update layout voor betere leesbaarheid
-            fig.update_layout(yaxis_title="Mood Tag", xaxis_title="Aantal keer gekozen")
-            
-            st.plotly_chart(fig, use_container_width=True)
+            pos_exploded = df["Positief"].fillna("").astype(str).str.split(", ").explode()
+            neg_exploded = df["Negatief"].fillna("").astype(str).str.split(", ").explode()
+            tags = [t for t in list(pos_exploded) + list(neg_exploded) if t != ""]
 
+            if not tags:
+                st.info("Nog geen mood-tags geregistreerd")
+            else:
+                tag_df = pd.DataFrame(tags, columns=["Lesmood"])
+                fig_mood = px.histogram(
+                    tag_df,
+                    y="Lesmood",
+                    title="Frequentie van lesmoods",
+                    category_orders={"Lesmood": tag_df["Lesmood"].value_counts().index.tolist()}
+                )
+                fig_mood.update_layout(yaxis_title="Mood Tag", xaxis_title="Aantal keer gekozen")
+                st.plotly_chart(fig_mood, use_container_width=True)
 
-# -------------------------------------------------
 # DIRECTOR VIEW
-# -------------------------------------------------
 else:
     st.header("🏫 Globaal klasoverzicht")
     all_data = []
@@ -204,17 +185,14 @@ else:
     files = [f for f in os.listdir(DATA_DIR) if f.endswith(".csv") and f != "users.csv"]
     
     for f in files:
-        df_temp = pd.read_csv(f"{DATA_DIR}/{f}")
+        df_temp = pd.read_csv(os.path.join(DATA_DIR, f))
         if not df_temp.empty:
             all_data.append(df_temp)
 
     if all_data:
-        big = pd.concat(all_data, ignore_index=True)
-        
-        # Groeperen en gemiddelde berekenen
-        overzicht = big.groupby("Klas").mean(numeric_only=True).round(2)
+        big_df = pd.concat(all_data, ignore_index=True)
+        overzicht = big_df.groupby("Klas").mean(numeric_only=True).round(2)
 
-        # Weergave opties
         col1, col2 = st.columns([1, 2])
         
         with col1:
@@ -223,19 +201,13 @@ else:
             
         with col2:
             st.subheader("Visuele Trends")
-            # Een heatmap werkt fantastisch voor directie-overzichten
-            import plotly.express as px
-            fig = px.imshow(
+            fig_dir = px.imshow(
                 overzicht.T, 
                 text_auto=True, 
                 aspect="auto",
-                color_continuous_scale="RdYlGn", # Rood naar Groen
+                color_continuous_scale="RdYlGn",
                 title="Sterktes en zwaktes per klas"
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig_dir, use_container_width=True)
     else:
         st.info("Nog geen data beschikbaar om een overzicht te genereren.")
-
-
-
-
