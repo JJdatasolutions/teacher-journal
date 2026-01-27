@@ -142,7 +142,8 @@ if user["role"] == "teacher":
     ])
 
     # -------- DAGREGISTRATIE --------
-    with tab1:
+    # -------- DAGREGISTRATIE --------
+with tab1:
     with st.form("day_log"):
         d = st.date_input("Datum", date.today())
         
@@ -172,7 +173,7 @@ if user["role"] == "teacher":
         s4.caption("Erg gestresseerd")
         s5.caption("Enorm gestresseerd")
 
-        # ✅ De submit button staat nu echt **binnen het form-block**
+        # ✅ Submit button binnen het form-block
         if st.form_submit_button("Opslaan"):
             day_df.loc[len(day_df)] = [
                 d, st.session_state.energie_slider, st.session_state.stress_slider
@@ -183,6 +184,7 @@ if user["role"] == "teacher":
             st.session_state.energie_slider = 3
             st.session_state.stress_slider = 3
             st.rerun()
+
 
     if not day_df.empty:
         fig = px.line(
@@ -321,6 +323,7 @@ else:
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Nog geen data van leerkrachten beschikbaar.")
+
 
 
 
