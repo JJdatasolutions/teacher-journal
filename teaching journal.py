@@ -40,77 +40,124 @@ def load_all_school_data():
     
     return df_days_total, df_lessons_total
 
-def draw_ridgeline(df, kolom, titel, kleur):
-    """Genereert de 'Ridgeline' visualisatie (Joyplot)"""
+import plotly.colors as pc
+
+def draw_ridgeline_artistic(df, kolom, titel, basis_kleur_naam="Teal"):
+    """
+    Maakt een 'Joyplot' met overlappende 'bergen' en een gradiënt.
+    """
     if df.empty: return None
     
-    klassen = sorted(df["Klas"].unique(), reverse=True) # Omgekeerd zodat 1e klas bovenaan staat
+    klassen = sorted(df["Klas"].unique(), reverse=True)
     fig = go.Figure()
 
-    for klas in klassen:
+    # Genereer een kleurenpalet op basis van het aantal klassen
+    # We pakken een spectrum (bijv. Teal of Sunset)
+    colors = px.colors.sample_colorscale(basis_kleur_naam, [n/(len(klassen)) for n in range(len(klassen))])
+
+    for i, klas in enumerate(klassen):
         df_k = df[df["Klas"] == klas]
+        
         fig.add_trace(go.Violin(
             x=df_k[kolom],
-            y=[klas]*len(df_k), # Dit zorgt voor de 'ridge' per rij
+            y=[klas] * len(df_k),
             name=klas,
             side='positive', 
             orientation='h', 
-            width=2, 
-            line_color=kleur, 
-            fillcolor=kleur,
-            opacity=0.6,
-            points=False, # Verberg individuele punten voor privacy
-            meanline_visible=True
+            width=2.5,  # Breder = meer overlap = mooier effect
+            line_color='white', # Witte rand maakt het 'clean'
+            line_width=1,
+            fillcolor=colors[i], # Gradiënt kleur
+            opacity=0.8,
+            points=False,
+            meanline_visible=False # Geen harde lijnen
         ))
 
     fig.update_layout(
-        title=titel,
-        xaxis_title="Score (1-5)",
+        title=dict(text=titel, font=dict(size=20, family="Arial", color="#333")),
+        xaxis_title=None,
         yaxis_title=None,
         showlegend=False,
-        height=400 + (len(klassen) * 30), # Dynamische hoogte
-        margin=dict(l=0, r=0, t=40, b=40),
-        plot_bgcolor='rgba(0,0,0,0)', # Transparant
-        xaxis=dict(range=[0.5, 5.5], dtick=1)
+        height=120 + (len(klassen) * 40),
+        margin=dict(l=0, r=0, t=50, b=20),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(range=[0.5, 5.5], showgrid=False, zeroline=False, visible=True),
+        yaxis=dict(showgrid=False, showline=False, showticklabels=True)
     )
     return fig
 
-def draw_sankey(df):
-    """Genereert een artistieke flow van Klas -> Gevoel"""
+def draw_sankey_artistic(df):
+    """
+    Een organische, semi-transparante flow chart.
+    """
     if df.empty: return None
     
-    # Data voorbereiden: Klas -> Positief label
+    # Data voorbereiden
     temp = df.copy()
     temp['Positief'] = temp['Positief'].astype(str).str.split(',')
     temp = temp.explode('Positief')
     temp['Positief'] = temp['Positief'].str.strip()
     temp = temp[temp['Positief'] != 'nan']
     
-    # Tellen
     counts = temp.groupby(['Klas', 'Positief']).size().reset_index(name='Aantal')
     if counts.empty: return None
     
-    # Nodes & Links maken
+    # Nodes bepalen
     klassen_uniek = list(counts['Klas'].unique())
     labels_uniek = list(counts['Positief'].unique())
     all_nodes = klassen_uniek + labels_uniek
     node_map = {name: i for i, name in enumerate(all_nodes)}
     
+    # Kleuren logica: 
+    # Klassen = Neutraal Grijs
+    # Labels = Zachte pasteltinten
+    colors_nodes = ["#7f8c8d"] * len(klassen_uniek) + px.colors.qualitative.Pastel[:len(labels_uniek)]
+    
+    # Link kleuren: De link krijgt de kleur van het DOEL (het label) maar dan transparant
+    link_colors = []
+    for target_label in counts['Positief']:
+        target_idx = klassen_uniek.index(counts[counts['Positief'] == target_label]['Klas'].iloc[0]) # Dummy find
+        # We zoeken de kleur van de target node in onze lijst
+        # Dit is een simpele hack: we geven de link gewoon een vaste zachte kleur
+        link_colors.append("rgba(100, 180, 200, 0.3)") 
+
+    # Voor een echt mooi effect: kleur de links op basis van de target node kleur
+    # Hier maken we het dynamisch:
+    final_link_colors = []
+    for _, row in counts.iterrows():
+        # Vind de index van het label in de kleurenlijst (offset door aantal klassen)
+        label_idx = labels_uniek.index(row['Positief'])
+        base_color = px.colors.qualitative.Pastel[label_idx % len(px.colors.qualitative.Pastel)]
+        
+        # Zet hex om naar rgba met 0.4 opacity
+        if base_color.startswith("#"):
+            r, g, b = tuple(int(base_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+            final_link_colors.append(f"rgba({r},{g},{b}, 0.4)")
+        else:
+            final_link_colors.append("rgba(200,200,200,0.4)")
+
     fig = go.Figure(data=[go.Sankey(
         node = dict(
-          pad = 15, thickness = 20,
-          line = dict(color = "black", width = 0.5),
+          pad = 20, thickness = 10,
+          line = dict(color = "white", width = 0.5),
           label = all_nodes,
-          color = ["#E0E0E0"] * len(klassen_uniek) + ["#a8e6cf"] * len(labels_uniek) # Subtiele kleuren
+          color = colors_nodes
         ),
         link = dict(
           source = counts['Klas'].map(node_map),
           target = counts['Positief'].map(node_map),
           value = counts['Aantal'],
-          color = "rgba(46, 204, 113, 0.2)" # Zacht groen transparant
+          color = final_link_colors # De 'magic' transparante kleuren
     ))])
     
-    fig.update_layout(title_text="Flow: Energiegevers per Klas", font_size=12, height=500)
+    fig.update_layout(
+        title_text="✨ De Energie Flow", 
+        font=dict(size=12, family="Arial"),
+        height=500,
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)'
+    )
     return fig
 # -------------------------------------------------
 # CONFIG (mobile first)
@@ -237,39 +284,42 @@ KLASSEN = [
 # DIRECTIE VIEW
 if user["role"] == "director":
     st.markdown("## 🏫 Dashboard Schoolwelzijn")
-    st.info("🔒 Deze data is volledig geanonimiseerd. Je ziet trends, geen individuen.")
+    st.markdown("---")
     
     df_days_all, df_lessons_all = load_all_school_data()
     
     if not df_lessons_all.empty:
-        # --- TOP LEVEL METRICS ---
+        # --- TOP LEVEL METRICS (Clean style) ---
         c1, c2, c3 = st.columns(3)
-        c1.metric("Aantal Lessen Geregistreerd", len(df_lessons_all))
-        c2.metric("Gem. School Energie", f"{df_days_all['Energie'].mean():.1f}" if not df_days_all.empty else "-")
-        c3.metric("Gem. School Stress", f"{df_days_all['Stress'].mean():.1f}" if not df_days_all.empty else "-")
+        c1.metric("Aantal Lessen", len(df_lessons_all))
+        c2.metric("School Energie", f"{df_days_all['Energie'].mean():.1f}" if not df_days_all.empty else "-")
+        c3.metric("School Stress", f"{df_days_all['Stress'].mean():.1f}" if not df_days_all.empty else "-")
         
-        st.divider()
+        st.write("") # Spacer
+
+        # --- ARTISTIEKE RIDGELINES ---
+        st.subheader("🎨 Landschap van de Lessen")
+        st.caption("De vorm toont de ervaring. Breed = verdeeldheid, Smal = consensus.")
         
-        # --- RIDGELINE PLOTS (DE VISUAL DIE JE WILDE) ---
-        st.subheader("📊 Spreiding per Klas (Ridgeline)")
-        st.caption("Hoe breder de vorm, hoe meer de ervaringen van leerkrachten uiteenlopen.")
-        
-        tab_ridge1, tab_ridge2 = st.tabs(["Lesaanpak", "Klasmanagement"])
+        tab_ridge1, tab_ridge2 = st.tabs(["Lesaanpak (Blauw)", "Klasmanagement (Rood)"])
         
         with tab_ridge1:
-            fig_aanpak = draw_ridgeline(df_lessons_all, "Lesaanpak", "Consistentie Lesaanpak", "#3498db")
+            # We gebruiken 'Tealgrn' voor een rustige blauw/groene vibe
+            fig_aanpak = draw_ridgeline_artistic(df_lessons_all, "Lesaanpak", "", "Tealgrn")
             st.plotly_chart(fig_aanpak, use_container_width=True)
             
         with tab_ridge2:
-            fig_mgmt = draw_ridgeline(df_lessons_all, "Klasmanagement", "Consistentie Klasmanagement", "#e74c3c")
+            # We gebruiken 'Purp' of 'Sunset' voor contrast
+            fig_mgmt = draw_ridgeline_artistic(df_lessons_all, "Klasmanagement", "", "Sunset")
             st.plotly_chart(fig_mgmt, use_container_width=True)
 
         st.divider()
 
-        # --- SANKEY (ARTISTIEK) ---
-        st.subheader("🌊 De 'Positieve Flow'")
-        st.caption("Welke klassen leveren welke positieve gevoelens op?")
-        fig_sankey = draw_sankey(df_lessons_all)
+        # --- ARTISTIEKE SANKEY ---
+        st.subheader("🌊 Emotionele Stromen")
+        st.caption("Hoe klassen zich vertalen naar positieve ervaringen.")
+        
+        fig_sankey = draw_sankey_artistic(df_lessons_all)
         if fig_sankey:
             st.plotly_chart(fig_sankey, use_container_width=True)
         else:
@@ -527,3 +577,4 @@ else:
 
                 with open(path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
