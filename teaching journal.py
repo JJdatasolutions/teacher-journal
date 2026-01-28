@@ -202,7 +202,6 @@ with tab1:
             ]
             day_df.to_csv(DAY_FILE, index=False)
             st.success("Geregistreerd! ✔️")
----------
 # ---------------- LESREGISTRATIE ----------------
 # ---------------- LESREGISTRATIE ----------------
 with tab2:
@@ -343,6 +342,7 @@ with tab3:
 
                 with open(pdf_path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
