@@ -126,6 +126,17 @@ if st.sidebar.button("Uitloggen"):
 # -------------------------------------------------
 POS_MOODS = ["Inspirerend", "Motiverend", "Actief", "Verbonden", "Respectvol", "Gefocust"]
 NEG_MOODS = ["Demotiverend", "Passief", "Onrespectvol", "Chaotisch", "Afgeleid"]
+KLASSEN = [
+    "5ECWI",
+    "5HW",
+    "5ECMT",
+    "5MT",
+    "3HW",
+    "6ECWI-HW",
+    "6MT",
+    "6WEWI",
+    "6ECMT"
+]
 
 # -------------------------------------------------
 # TEACHER VIEW
@@ -170,130 +181,116 @@ if user["role"] == "teacher":
                 st.rerun()
 
     # ---------------- LESREGISTRATIE ----------------
+# ---------------- LESREGISTRATIE ----------------
 with tab2:
     with st.form("lesregistratie"):
-        klas = st.text_input("Klas / Groep", key="klas_input")
+        klas = st.selectbox(
+            "Klas / Groep",
+            KLASSEN,
+            key="klas_select"
+        )
 
         st.slider("Lesaanpak", 1, 5, key="lesaanpak")
-        st.caption("Zeer onduidelijk · Onvoldoende · Oké · Duidelijk · Zeer sterk")
+        st.caption("1 = sloeg niet aan · 2 = zwak · 3 = oké · 4 = goed · 5 = zeer sterk")
 
         st.slider("Klasmanagement", 1, 5, key="klasmanagement")
-        st.caption("Chaotisch · Moeizaam · Redelijk · Goed · Zeer sterk")
+        st.caption("1 = chaotisch · 2 = moeizaam · 3 = oké · 4 = goed · 5 = zeer sterk")
 
         positief = st.multiselect(
-            "Positieve sfeer (meerdere mogelijk)",
+            "Positieve lesmood",
             POS_MOODS,
             key="pos_moods"
         )
 
         negatief = st.multiselect(
-            "Negatieve sfeer (meerdere mogelijk)",
+            "Negatieve lesmood",
             NEG_MOODS,
             key="neg_moods"
         )
 
         if st.form_submit_button("Les opslaan"):
-            if not klas:
-                st.error("Vul een klas of groep in.")
-            else:
-                les_df.loc[len(les_df)] = [
-                    date.today(),
-                    klas,
-                    st.session_state.lesaanpak,
-                    st.session_state.klasmanagement,
-                    ", ".join(positief),
-                    ", ".join(negatief)
-                ]
-                les_df.to_csv(LES_FILE, index=False)
-                st.success("Les succesvol geregistreerd!")
+            les_df.loc[len(les_df)] = [
+                date.today(),
+                klas,
+                st.session_state.lesaanpak,
+                st.session_state.klasmanagement,
+                ", ".join(positief),
+                ", ".join(negatief)
+            ]
 
-                st.session_state.lesaanpak = 3
-                st.session_state.klasmanagement = 3
-                st.session_state.pos_moods = []
-                st.session_state.neg_moods = []
+            les_df.to_csv(LES_FILE, index=False)
+            st.success("Les succesvol opgeslagen!")
 
-                st.rerun()
+            st.session_state.lesaanpak = 3
+            st.session_state.klasmanagement = 3
+            st.session_state.pos_moods = []
+            st.session_state.neg_moods = []
+
+            st.rerun()
 
     # ---------------- VISUALISATIES ----------------
+# ---------------- VISUALISATIES ----------------
 with tab3:
-    st.subheader("📈 Trends over tijd")
-
-    if day_df.empty:
-        st.info("Nog geen dagregistraties beschikbaar.")
-    else:
-        day_plot = day_df.sort_values("Datum")
-
-        fig1 = px.line(
-            day_plot,
-            x="Datum",
-            y=["Energie", "Stress"],
-            markers=True,
-            title="Energie & Stress over tijd"
-        )
-        st.plotly_chart(fig1, use_container_width=True)
-
-    st.divider()
-    st.subheader("📊 Leskwaliteit")
+    st.subheader("📊 Gemiddelde leskwaliteit per klas")
 
     if les_df.empty:
         st.info("Nog geen lesregistraties beschikbaar.")
     else:
-        les_plot = les_df.sort_values("Datum")
+        # Gemiddelden per klas
+        klas_stats = (
+            les_df
+            .groupby("Klas")[["Lesaanpak", "Klasmanagement"]]
+            .mean()
+            .reindex(KLASSEN)
+            .dropna(how="all")
+            .reset_index()
+        )
 
-        fig2 = px.bar(
-            les_plot,
-            x="Datum",
+        fig1 = px.bar(
+            klas_stats,
+            x="Klas",
             y=["Lesaanpak", "Klasmanagement"],
             barmode="group",
-            title="Lesaanpak & Klasmanagement per les"
+            title="Vergelijking lesaanpak & klasmanagement per klas"
         )
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig1, use_container_width=True)
 
     st.divider()
-    st.subheader("😊 Sfeerwoorden (frequentie)")
+    st.subheader("😊 Lesmood per klas")
 
     if not les_df.empty:
-        pos_counts = (
-            les_df["Positief"]
-            .dropna()
-            .str.split(", ")
-            .explode()
-            .value_counts()
+        mood_data = []
+
+        for _, row in les_df.iterrows():
+            for p in str(row["Positief"]).split(", "):
+                if p:
+                    mood_data.append([row["Klas"], p, "Positief"])
+            for n in str(row["Negatief"]).split(", "):
+                if n:
+                    mood_data.append([row["Klas"], n, "Negatief"])
+
+        mood_df = pd.DataFrame(mood_data, columns=["Klas", "Mood", "Type"])
+
+        klas_filter = st.selectbox(
+            "Filter op klas",
+            ["Alle"] + KLASSEN
         )
 
-        neg_counts = (
-            les_df["Negatief"]
-            .dropna()
-            .str.split(", ")
-            .explode()
-            .value_counts()
+        plot_df = (
+            mood_df
+            if klas_filter == "Alle"
+            else mood_df[mood_df["Klas"] == klas_filter]
         )
 
-        col1, col2 = st.columns(2)
+        fig2 = px.bar(
+            plot_df.groupby(["Mood", "Type"]).size().reset_index(name="Aantal"),
+            x="Mood",
+            y="Aantal",
+            color="Type",
+            title="Sfeerwoorden per klas" if klas_filter == "Alle" else f"Sfeerwoorden – {klas_filter}"
+        )
 
-        with col1:
-            if not pos_counts.empty:
-                fig3 = px.bar(
-                    pos_counts,
-                    x=pos_counts.index,
-                    y=pos_counts.values,
-                    title="Positieve sfeer"
-                )
-                st.plotly_chart(fig3, use_container_width=True)
-            else:
-                st.info("Nog geen positieve labels.")
-
-        with col2:
-            if not neg_counts.empty:
-                fig4 = px.bar(
-                    neg_counts,
-                    x=neg_counts.index,
-                    y=neg_counts.values,
-                    title="Negatieve sfeer"
-                )
-                st.plotly_chart(fig4, use_container_width=True)
-            else:
-                st.info("Nog geen negatieve labels.")
+        st.plotly_chart(fig2, use_container_width=True)
 
     # ---------------- PDF ----------------
     with tab4:
@@ -319,5 +316,6 @@ with tab3:
 
                 with open(pdf_path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
