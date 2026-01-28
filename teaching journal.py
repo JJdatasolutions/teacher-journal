@@ -306,52 +306,47 @@ else:
     else:
         df = les_df[les_df["Klas"].isin(klas_keuze)].copy()
 
-        # Alle labels opsplitsen
+        # Labels opsplitsen
         positief_series = df["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
         negatief_series = df["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
 
         if positief_series.empty and negatief_series.empty:
             st.info("Nog geen labels aangeduid.")
         else:
-            import plotly.express as px
+            from wordcloud import WordCloud
+            import matplotlib.pyplot as plt
 
-            # Maak één dataframe voor alle labels
+            # Combineer labels met type en frequentie
             all_labels = pd.concat([
                 pd.DataFrame({"Label": positief_series, "Type": "Positief"}),
                 pd.DataFrame({"Label": negatief_series, "Type": "Negatief"})
             ])
-
             label_counts = all_labels.groupby(["Label", "Type"]).size().reset_index(name="Aantal")
-            
-            # Positief = groen, negatief = rood
-            label_counts["Kleur"] = label_counts["Type"].apply(lambda t: "green" if t=="Positief" else "red")
 
-            # -----------------------------
-            # Plotly scatter als WordCloud
-            # -----------------------------
-            fig_wc = px.scatter(
-                label_counts,
-                x=[0]*len(label_counts),  # dummy x
-                y=[0]*len(label_counts),  # dummy y
-                size="Aantal",
-                size_max=60,
-                text="Label",
-                color="Kleur",
-                color_discrete_map={"green": "green", "red": "red"},
-                hover_data={"Aantal": True, "Label": True, "Kleur": False}
-            )
+            # Woorden & kleurenlijst
+            words_freq = dict(zip(label_counts["Label"], label_counts["Aantal"]))
+            label_color = dict(zip(label_counts["Label"],
+                                   ["green" if t=="Positief" else "red" for t in label_counts["Type"]]))
 
-            # Zet alle punten op dezelfde plek en laat ze overlappen: 'bubble' style
-            fig_wc.update_traces(textposition="middle center", marker=dict(line=dict(width=1, color="DarkSlateGrey")))
-            fig_wc.update_layout(
-                xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
-                yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
-                title="Labelgebruik (grote woorden = vaker aangeduid)",
-                showlegend=False,
-                height=500
-            )
+            # Custom color function voor WordCloud
+            def color_func(word, **kwargs):
+                return label_color.get(word, "black")
 
-            st.plotly_chart(fig_wc, use_container_width=True)
+            wc = WordCloud(
+                width=800,
+                height=400,
+                background_color="white",
+                prefer_horizontal=0.9,
+                min_font_size=10,
+                max_font_size=100,
+                random_state=42
+            ).generate_from_frequencies(words_freq)
+
+            # Plotten met Matplotlib
+            fig, ax = plt.subplots(figsize=(12, 6))
+            ax.imshow(wc.recolor(color_func=color_func, random_state=42), interpolation="bilinear")
+            ax.axis("off")
+            st.pyplot(fig)
 
 
 
@@ -388,6 +383,7 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
