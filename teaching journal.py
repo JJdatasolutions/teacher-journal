@@ -247,10 +247,25 @@ with tab3:
 
     st.divider()
 
-    # 2. ALGEMENE WORDCLOUD (Alle data)
-    st.subheader("🖌 Alle labels (Totaaloverzicht)")
+    st.divider()
+
+    # 2. ALGEMENE STATISTIEKEN & WORDCLOUD
+    st.subheader("🌍 Totaaloverzicht (Alle lessen)")
+    
     if not les_df.empty:
-        # Data voorbereiden
+        # --- NIEUW: Algemene gemiddeldes visueel weergeven ---
+        avg_aanpak_totaal = les_df["Lesaanpak"].mean()
+        avg_mgmt_totaal = les_df["Klasmanagement"].mean()
+
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            st.metric("Gem. Lesaanpak", f"{avg_aanpak_totaal:.2f} / 5")
+        with col_m2:
+            st.metric("Gem. Klasmanagement", f"{avg_mgmt_totaal:.2f} / 5")
+        
+        st.write("---") # Subtiele scheidingslijn tussen cijfers en WordCloud
+
+        # --- WordCloud Logica ---
         pos_series = les_df["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
         neg_series = les_df["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
         
@@ -263,7 +278,6 @@ with tab3:
         if not all_labels.empty:
             counts = all_labels.groupby(["Label", "Type"]).size().reset_index(name="Aantal")
             words_freq = dict(zip(counts["Label"], counts["Aantal"]))
-            # Kleurenmap maken
             label_color_map = dict(zip(counts["Label"], ["green" if t == "Positief" else "red" for t in counts["Type"]]))
 
             from wordcloud import WordCloud
@@ -271,13 +285,14 @@ with tab3:
 
             wc = WordCloud(width=800, height=400, background_color="white", random_state=42).generate_from_frequencies(words_freq)
             
-            # FIX: Gebruik 'word' als expliciet keyword argument in de lambda
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(figsize=(10, 5))
             ax.imshow(wc.recolor(color_func=lambda word, **kwargs: label_color_map.get(word, "black")), interpolation="bilinear")
             ax.axis("off")
             st.pyplot(fig)
+        else:
+            st.info("Geen labels beschikbaar om de WordCloud te tonen.")
     else:
-        st.info("Nog geen lesdata voor een WordCloud.")
+        st.info("Nog geen lesdata beschikbaar voor het totaaloverzicht.")
 
     st.divider()
 
@@ -362,6 +377,7 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
