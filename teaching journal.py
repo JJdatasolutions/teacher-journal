@@ -246,6 +246,20 @@ with tab3:
         fig_bar.update_layout(yaxis_range=[1, 5])
         st.plotly_chart(fig_bar, use_container_width=True)
 
+        st.subheader("📈 Daggevoel (Energie & Stress)")
+        if not day_df.empty:
+        fig_line = px.line(
+        day_df.sort_values("Datum"),
+        x="Datum",
+        y=["Energie", "Stress"],
+        markers=True,
+        title="Daggevoel door de tijd"
+    )
+    fig_line.update_layout(yaxis_range=[1,5])
+    st.plotly_chart(fig_line, use_container_width=True)
+else:
+    st.info("Nog geen daggevoel geregistreerd.")
+
         # -----------------------------
         # LABEL ANALYSE (RADAR)
         # -----------------------------
@@ -383,6 +397,7 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
