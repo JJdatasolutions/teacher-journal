@@ -164,23 +164,45 @@ if user["role"] == "teacher":
     ])
 
     # ---------------- DAGGEVOEL ----------------
-    with tab1:
-        with st.form("daggevoel"):
-            st.slider("Energie", 1, 5, key="energie")
-            st.caption("Uitgeput · Weinig energie · Oké · Veel energie · Barstend van energie")
+   # ---------------- DAGGEVOEL ----------------
+with tab1:
+    with st.form("daggevoel", clear_on_submit=True):
 
-            st.slider("Stress", 1, 5, key="stress")
-            st.caption("Volkomen rustig · Licht gespannen · Gemiddeld · Erg gestresseerd · Enorm gestresseerd")
+        d = st.date_input("Datum", date.today())
 
-            if st.form_submit_button("Opslaan"):
-                day_df.loc[len(day_df)] = [date.today(), st.session_state.energie, st.session_state.stress]
-                day_df.to_csv(DAY_FILE, index=False)
-                st.success("Geregistreerd!")
-                st.session_state.energie = 3
-                st.session_state.stress = 3
-                st.rerun()
+        energie = st.slider(
+            "Energie",
+            1, 5, 3
+        )
+        st.caption(
+            "1 = uitgeput · "
+            "2 = weinig energie · "
+            "3 = oké · "
+            "4 = veel energie · "
+            "5 = barstend van energie"
+        )
 
-    # ---------------- LESREGISTRATIE ----------------
+        stress = st.slider(
+            "Stress",
+            1, 5, 3
+        )
+        st.caption(
+            "1 = volkomen rustig · "
+            "2 = licht gespannen · "
+            "3 = gemiddeld · "
+            "4 = erg gestresseerd · "
+            "5 = enorm gestresseerd"
+        )
+
+        if st.form_submit_button("Opslaan"):
+            day_df.loc[len(day_df)] = [
+                d,
+                energie,
+                stress
+            ]
+            day_df.to_csv(DAY_FILE, index=False)
+            st.success("Geregistreerd! ✔️")
+---------
 # ---------------- LESREGISTRATIE ----------------
 # ---------------- LESREGISTRATIE ----------------
 with tab2:
@@ -321,6 +343,7 @@ with tab3:
 
                 with open(pdf_path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
