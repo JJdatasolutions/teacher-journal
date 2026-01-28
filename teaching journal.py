@@ -293,6 +293,9 @@ with tab3:
     # KLASVERGELIJKING (alleen 2 klassen)
     # -----------------------------
     st.subheader("⚖️ Vergelijking tussen 2 klassen")
+
+if not les_df.empty:
+    klassen = sorted(les_df["Klas"].dropna().unique().tolist())  # <-- voeg dit toe
     klas_keuze = st.multiselect(
         "Selecteer 2 klassen om te vergelijken:",
         klassen,
@@ -301,8 +304,10 @@ with tab3:
 
     if len(klas_keuze) == 2:
         k1, k2 = klas_keuze
-        df1 = les_df[les_df["Klas"]==k1]
-        df2 = les_df[les_df["Klas"]==k2]
+        df1 = les_df[les_df["Klas"] == k1]
+        df2 = les_df[les_df["Klas"] == k2]
+        # ... hier komt de rest van de kolommen met WordCloud + bar chart
+
 
         c1, c2 = st.columns(2)
 
@@ -410,6 +415,7 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
