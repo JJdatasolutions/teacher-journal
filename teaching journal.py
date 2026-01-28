@@ -208,10 +208,120 @@ with tab2:
 # VISUALISATIES
 # -------------------------------------------------
 with tab3:
-    if not les_df.empty:
-        stats = les_df.groupby("Klas")[["Lesaanpak", "Klasmanagement"]].mean().reset_index()
-        fig = px.bar(stats, x="Klas", y=["Lesaanpak", "Klasmanagement"], barmode="group")
-        st.plotly_chart(fig, use_container_width=True)
+    st.header("📊 Visualisaties")
+
+    if les_df.empty:
+        st.info("Nog geen lesdata beschikbaar.")
+    else:
+        # -----------------------------
+        # FILTER: KLAS
+        # -----------------------------
+        klassen = sorted(les_df["Klas"].dropna().unique().tolist())
+        klas_keuze = st.selectbox(
+            "Selecteer klas",
+            ["Alle klassen"] + klassen
+        )
+
+        if klas_keuze != "Alle klassen":
+            df = les_df[les_df["Klas"] == klas_keuze].copy()
+        else:
+            df = les_df.copy()
+
+        # -----------------------------
+        # GEMIDDELDE LESAANPAK
+        # -----------------------------
+        st.subheader("📘 Gemiddelde lesaanpak")
+
+        avg_lesaanpak = (
+            df.groupby("Klas", as_index=False)["Lesaanpak"]
+            .mean()
+        )
+
+        fig_bar = px.bar(
+            avg_lesaanpak,
+            x="Klas",
+            y="Lesaanpak",
+            text_auto=".2f",
+            title="Gemiddelde score lesaanpak per klas",
+        )
+        fig_bar.update_layout(yaxis_range=[1, 5])
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+        # -----------------------------
+        # LABEL ANALYSE (RADAR)
+        # -----------------------------
+        st.subheader("🧭 Labelgebruik (frequentie)")
+
+        if "Labels" not in df.columns:
+            st.warning("Geen labels beschikbaar in de data.")
+        else:
+            # Labels opsplitsen
+            label_series = (
+                df["Labels"]
+                .dropna()
+                .astype(str)
+                .str.split(",")
+                .explode()
+                .str.strip()
+            )
+
+            if label_series.empty:
+                st.info("Nog geen labels aangeduid.")
+            else:
+                label_counts = label_series.value_counts().reset_index()
+                label_counts.columns = ["Label", "Aantal"]
+
+                # -----------------------------
+                # POSITIEF / NEGATIEF DEFINIËREN
+                # -----------------------------
+                positieve_labels = [
+                    Inspirerend", "Motiverend", "Actief", "Verbonden", "Respectvol", "Gefocust", "Veilig", "Energiek"
+                ]
+
+
+                ]
+                negatieve_labels = [
+                   "Demotiverend", "Passief", "Onrespectvol", "Chaotisch", "Afgeleid", "Spannend", "Onveilig"
+                ]
+
+                def label_kleur(label):
+                    if label in positieve_labels:
+                        return px.colors.sequential.Greens[
+                            positieve_labels.index(label) % len(px.colors.sequential.Greens)
+                        ]
+                    elif label in negatieve_labels:
+                        return px.colors.sequential.Reds[
+                            negatieve_labels.index(label) % len(px.colors.sequential.Reds)
+                        ]
+                    else:
+                        return "#888888"  # neutraal
+
+                label_counts["Kleur"] = label_counts["Label"].apply(label_kleur)
+
+                # Radar chart
+                fig_radar = go.Figure()
+
+                for _, row in label_counts.iterrows():
+                    fig_radar.add_trace(
+                        go.Scatterpolar(
+                            r=[row["Aantal"]],
+                            theta=[row["Label"]],
+                            fill="toself",
+                            name=row["Label"],
+                            marker_color=row["Kleur"],
+                        )
+                    )
+
+                fig_radar.update_layout(
+                    polar=dict(
+                        radialaxis=dict(visible=True, tickfont_size=10)
+                    ),
+                    title="Hoe vaak werden labels aangeduid?",
+                    showlegend=True,
+                )
+
+                st.plotly_chart(fig_radar, use_container_width=True)
+
 
 # -------------------------------------------------
 # PDF – VORIGE MAAND
@@ -246,4 +356,5 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
