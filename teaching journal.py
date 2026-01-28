@@ -89,74 +89,71 @@ def draw_ridgeline_artistic(df, kolom, titel, basis_kleur_naam="Teal"):
 
 def draw_sankey_artistic(df):
     """
-    Een organische, semi-transparante flow chart.
+    Een organische flow chart, geoptimaliseerd voor leesbaarheid.
     """
     if df.empty: return None
     
-    # Data voorbereiden
+    # 1. Data voorbereiden
     temp = df.copy()
     temp['Positief'] = temp['Positief'].astype(str).str.split(',')
     temp = temp.explode('Positief')
     temp['Positief'] = temp['Positief'].str.strip()
-    temp = temp[temp['Positief'] != 'nan']
+    # Filter lege waarden en 'nan' strings
+    temp = temp[(temp['Positief'] != 'nan') & (temp['Positief'] != '')]
     
     counts = temp.groupby(['Klas', 'Positief']).size().reset_index(name='Aantal')
     if counts.empty: return None
     
-    # Nodes bepalen
+    # 2. Nodes bepalen
     klassen_uniek = list(counts['Klas'].unique())
     labels_uniek = list(counts['Positief'].unique())
     all_nodes = klassen_uniek + labels_uniek
     node_map = {name: i for i, name in enumerate(all_nodes)}
     
-    # Kleuren logica: 
-    # Klassen = Neutraal Grijs
-    # Labels = Zachte pasteltinten
-    colors_nodes = ["#7f8c8d"] * len(klassen_uniek) + px.colors.qualitative.Pastel[:len(labels_uniek)]
+    # 3. Kleuren logica (Grijs voor klassen, Pastel voor labels)
+    colors_nodes = ["#636e72"] * len(klassen_uniek) + px.colors.qualitative.Pastel[:len(labels_uniek)]
     
-    # Link kleuren: De link krijgt de kleur van het DOEL (het label) maar dan transparant
-    link_colors = []
-    for target_label in counts['Positief']:
-        target_idx = klassen_uniek.index(counts[counts['Positief'] == target_label]['Klas'].iloc[0]) # Dummy find
-        # We zoeken de kleur van de target node in onze lijst
-        # Dit is een simpele hack: we geven de link gewoon een vaste zachte kleur
-        link_colors.append("rgba(100, 180, 200, 0.3)") 
-
-    # Voor een echt mooi effect: kleur de links op basis van de target node kleur
-    # Hier maken we het dynamisch:
+    # 4. Link kleuren (Semi-transparant op basis van doelkleur)
     final_link_colors = []
     for _, row in counts.iterrows():
-        # Vind de index van het label in de kleurenlijst (offset door aantal klassen)
         label_idx = labels_uniek.index(row['Positief'])
+        # Pak de kleur uit de pastel lijst, roteer als er meer labels zijn dan kleuren
         base_color = px.colors.qualitative.Pastel[label_idx % len(px.colors.qualitative.Pastel)]
         
-        # Zet hex om naar rgba met 0.4 opacity
+        # Zet hex om naar rgba met 0.4 opacity (zachter effect)
         if base_color.startswith("#"):
             r, g, b = tuple(int(base_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
             final_link_colors.append(f"rgba({r},{g},{b}, 0.4)")
         else:
             final_link_colors.append("rgba(200,200,200,0.4)")
 
+    # 5. Bepaal dynamische hoogte (belangrijk voor leesbaarheid!)
+    # Minimaal 500px, maar voeg 40px toe per extra label als het er veel zijn
+    dynamic_height = max(500, len(all_nodes) * 40)
+
     fig = go.Figure(data=[go.Sankey(
+        textfont=dict(size=14, color="black", family="Arial Black"), # Duidelijkere tekst
         node = dict(
-          pad = 20, thickness = 10,
-          line = dict(color = "white", width = 0.5),
-          label = all_nodes,
+          pad = 40,             # Meer ruimte tussen de blokjes
+          thickness = 25,       # Iets dikkere blokjes om de tekst 'vast' te houden
+          line = dict(color = "white", width = 1),
+          label = [f" {name} " for name in all_nodes], # Spaties voor betere uitlijning
           color = colors_nodes
         ),
         link = dict(
           source = counts['Klas'].map(node_map),
           target = counts['Positief'].map(node_map),
           value = counts['Aantal'],
-          color = final_link_colors # De 'magic' transparante kleuren
+          color = final_link_colors
     ))])
     
     fig.update_layout(
-        title_text="✨ De Energie Flow", 
-        font=dict(size=12, family="Arial"),
-        height=500,
+        title=dict(text="🌊 Emotionele Stromen", font=dict(size=20)),
+        height=dynamic_height,  # Hier passen we de hoogte aan
+        font=dict(size=14),     # Algemene fontgrootte omhoog
         plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)'
+        paper_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=20, r=20, t=60, b=40) # Marges zodat tekst niet van het scherm valt
     )
     return fig
 # -------------------------------------------------
@@ -577,4 +574,5 @@ else:
 
                 with open(path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
