@@ -220,7 +220,14 @@ with tab4:
     today = date.today()
     last_month = (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
 
-    subset = day_df[day_df["Datum"].dt.strftime("%Y-%m") == last_month]
+    # --- ABSOLUUT VEILIGE DATUMAFHANDELING ---
+    day_df["Datum"] = pd.to_datetime(day_df["Datum"], errors="coerce")
+    day_df = day_df.dropna(subset=["Datum"])
+
+    subset = day_df[
+        day_df["Datum"].apply(lambda x: x.strftime("%Y-%m")) == last_month
+    ]
+
 
     if subset.empty:
         st.info("Nog geen gegevens voor vorige maand.")
@@ -239,3 +246,4 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
