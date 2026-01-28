@@ -329,7 +329,7 @@ if user["role"] == "director":
         st.subheader("🌊 Emotionele Stromen")
         st.caption("Hoe klassen zich vertalen naar positieve ervaringen.")
         
-        fig_sankey = draw_sankey_artistic(df_lessons_all)
+        fig_sankey = draw_sankey_butterfly(df_lessons_all)
         if fig_sankey:
             st.plotly_chart(fig_sankey, use_container_width=True)
         else:
@@ -587,6 +587,7 @@ else:
 
                 with open(path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
