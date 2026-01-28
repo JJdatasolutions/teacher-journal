@@ -262,47 +262,55 @@ else:
 
 
         # -----------------------------
-        # LABEL ANALYSE (RADAR)
-        # -----------------------------
-        st.subheader("🧭 Labelgebruik (frequentie)")
+# LABEL ANALYSE (WORDCLOUD)
+# -----------------------------
+st.subheader("🖌 Labelgebruik (WordCloud)")
 
-        if "Positief" not in df.columns or "Negatief" not in df.columns:
-            st.warning("Geen labels beschikbaar in de data.")
-        else:
-            # Alle labels opsplitsen en combineren
-            positief_series = df["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
-            negatief_series = df["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
+if "Positief" not in df.columns or "Negatief" not in df.columns:
+    st.warning("Geen labels beschikbaar in de data.")
+else:
+    # Positieve en negatieve labels opsplitsen
+    positief_series = df["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
+    negatief_series = df["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
 
-            label_series = pd.concat([positief_series, negatief_series])
-            if label_series.empty:
-                st.info("Nog geen labels aangeduid.")
-            else:
-                label_counts = label_series.value_counts().reset_index()
-                label_counts.columns = ["Label", "Aantal"]
+    if positief_series.empty and negatief_series.empty:
+        st.info("Nog geen labels aangeduid.")
+    else:
+        from wordcloud import WordCloud
+        import matplotlib.pyplot as plt
 
-                # -----------------------------
-                # POSITIEF / NEGATIEF DEFINIËREN
-                # -----------------------------
-                positieve_labels = [
-                    "Inspirerend", "Motiverend", "Actief", "Verbonden",
-                    "Respectvol", "Gefocust", "Veilig", "Energiek"
-                ]
-                negatieve_labels = [
-                    "Demotiverend", "Passief", "Onrespectvol", "Chaotisch",
-                    "Afgeleid", "Spannend", "Onveilig"
-                ]
+        # Combineer labels en tel frequentie
+        all_labels = pd.concat([
+            pd.DataFrame({"Label": positief_series, "Type": "Positief"}),
+            pd.DataFrame({"Label": negatief_series, "Type": "Negatief"})
+        ])
+        label_counts = all_labels.groupby(["Label", "Type"]).size().reset_index(name="Aantal")
 
-                def label_kleur(label):
-                    if label in positieve_labels:
-                        idx = positieve_labels.index(label) % len(px.colors.sequential.Greens)
-                        return px.colors.sequential.Greens[idx]
-                    elif label in negatieve_labels:
-                        idx = negatieve_labels.index(label) % len(px.colors.sequential.Reds)
-                        return px.colors.sequential.Reds[idx]
-                    else:
-                        return "#888888"  # neutraal
+        # Frequencies en kleuren
+        words_freq = dict(zip(label_counts["Label"], label_counts["Aantal"]))
+        label_color = dict(zip(label_counts["Label"],
+                               ["green" if t=="Positief" else "red" for t in label_counts["Type"]]))
 
-                label_counts["Kleur"] = label_counts["Label"].apply(label_kleur)
+        # Custom color function
+        def color_func(word, **kwargs):
+            return label_color.get(word, "black")
+
+        # WordCloud genereren
+        wc = WordCloud(
+            width=800,
+            height=400,
+            background_color="white",
+            prefer_horizontal=0.9,
+            min_font_size=10,
+            max_font_size=100,
+            random_state=42
+        ).generate_from_frequencies(words_freq)
+
+        # Plotten
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.imshow(wc.recolor(color_func=color_func, random_state=42), interpolation="bilinear")
+        ax.axis("off")
+        st.pyplot(fig)
 
 # -----------------------------
 # WORDCLOUD WEERGAVE
@@ -398,6 +406,7 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
