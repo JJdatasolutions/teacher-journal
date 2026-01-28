@@ -289,31 +289,54 @@ with tab3:
 
                 label_counts["Kleur"] = label_counts["Label"].apply(label_kleur)
 
-                # -----------------------------
-                # RADAR CHART
-                # -----------------------------
-                fig_radar = go.Figure()
+               # -----------------------------
+# RADAR CHART (verbeterd)
+# -----------------------------
+# Positieve en negatieve labels apart tellen
+pos_counts = label_counts[label_counts["Label"].isin(positieve_labels)]
+neg_counts = label_counts[label_counts["Label"].isin(negatieve_labels)]
 
-                for _, row in label_counts.iterrows():
-                    fig_radar.add_trace(
-                        go.Scatterpolar(
-                            r=[row["Aantal"]],
-                            theta=[row["Label"]],
-                            fill="toself",
-                            name=row["Label"],
-                            marker_color=row["Kleur"],
-                        )
-                    )
+# Sorteer labels op alfabet of aantal
+pos_counts = pos_counts.sort_values("Label")
+neg_counts = neg_counts.sort_values("Label")
 
-                fig_radar.update_layout(
-                    polar=dict(
-                        radialaxis=dict(visible=True, tickfont_size=10)
-                    ),
-                    title="Hoe vaak werden labels aangeduid?",
-                    showlegend=True,
-                )
+fig_radar = go.Figure()
 
-                st.plotly_chart(fig_radar, use_container_width=True)
+# Positieve labels
+fig_radar.add_trace(
+    go.Scatterpolar(
+        r=pos_counts["Aantal"],
+        theta=pos_counts["Label"],
+        fill="toself",
+        name="Positief",
+        marker_color="green",
+        line_color="green",
+    )
+)
+
+# Negatieve labels
+fig_radar.add_trace(
+    go.Scatterpolar(
+        r=neg_counts["Aantal"],
+        theta=neg_counts["Label"],
+        fill="toself",
+        name="Negatief",
+        marker_color="red",
+        line_color="red",
+    )
+)
+
+fig_radar.update_layout(
+    polar=dict(
+        radialaxis=dict(visible=True, tickfont_size=10, range=[0, max(label_counts["Aantal"].max(), 1)]),
+        angularaxis=dict(tickfont_size=10)
+    ),
+    title="Hoe vaak werden labels aangeduid?",
+    showlegend=True,
+)
+
+st.plotly_chart(fig_radar, use_container_width=True)
+
 
 # -------------------------------------------------
 # PDF – VORIGE MAAND
@@ -348,6 +371,7 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
