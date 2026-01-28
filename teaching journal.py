@@ -289,53 +289,70 @@ with tab3:
 
                 label_counts["Kleur"] = label_counts["Label"].apply(label_kleur)
 
-               # -----------------------------
-# RADAR CHART (verbeterd)
 # -----------------------------
-# Positieve en negatieve labels apart tellen
-pos_counts = label_counts[label_counts["Label"].isin(positieve_labels)]
-neg_counts = label_counts[label_counts["Label"].isin(negatieve_labels)]
+# WORDCLOUD WEERGAVE
+# -----------------------------
+st.subheader("🖌 Labelgebruik (WordCloud)")
 
-# Sorteer labels op alfabet of aantal
-pos_counts = pos_counts.sort_values("Label")
-neg_counts = neg_counts.sort_values("Label")
+if les_df.empty:
+    st.info("Nog geen lesdata beschikbaar.")
+else:
+    # Filter op klas
+    klassen = sorted(les_df["Klas"].dropna().unique().tolist())
+    klas_keuze = st.multiselect("Selecteer klassen om te vergelijken:", klassen, default=klassen)
 
-fig_radar = go.Figure()
+    if not klas_keuze:
+        st.info("Selecteer minstens één klas")
+    else:
+        df = les_df[les_df["Klas"].isin(klas_keuze)].copy()
 
-# Positieve labels
-fig_radar.add_trace(
-    go.Scatterpolar(
-        r=pos_counts["Aantal"],
-        theta=pos_counts["Label"],
-        fill="toself",
-        name="Positief",
-        marker_color="green",
-        line_color="green",
-    )
-)
+        # Alle labels opsplitsen
+        positief_series = df["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
+        negatief_series = df["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
 
-# Negatieve labels
-fig_radar.add_trace(
-    go.Scatterpolar(
-        r=neg_counts["Aantal"],
-        theta=neg_counts["Label"],
-        fill="toself",
-        name="Negatief",
-        marker_color="red",
-        line_color="red",
-    )
-)
+        if positief_series.empty and negatief_series.empty:
+            st.info("Nog geen labels aangeduid.")
+        else:
+            import plotly.express as px
 
-fig_radar.update_layout(
-    polar=dict(
-        radialaxis=dict(visible=True, tickfont_size=10, range=[0, max(label_counts["Aantal"].max(), 1)]),
-        angularaxis=dict(tickfont_size=10)
-    ),
-    title="Hoe vaak werden labels aangeduid?",
-    showlegend=True,
-)
+            # Maak één dataframe voor alle labels
+            all_labels = pd.concat([
+                pd.DataFrame({"Label": positief_series, "Type": "Positief"}),
+                pd.DataFrame({"Label": negatief_series, "Type": "Negatief"})
+            ])
 
-st.plotly_chart(fig_radar, use_container_width=True)
+            label_counts = all_labels.groupby(["Label", "Type"]).size().reset_index(name="Aantal")
+            
+            # Positief = groen, negatief = rood
+            label_counts["Kleur"] = label_counts["Type"].apply(lambda t: "green" if t=="Positief" else "red")
+
+            # -----------------------------
+            # Plotly scatter als WordCloud
+            # -----------------------------
+            fig_wc = px.scatter(
+                label_counts,
+                x=[0]*len(label_counts),  # dummy x
+                y=[0]*len(label_counts),  # dummy y
+                size="Aantal",
+                size_max=60,
+                text="Label",
+                color="Kleur",
+                color_discrete_map={"green": "green", "red": "red"},
+                hover_data={"Aantal": True, "Label": True, "Kleur": False}
+            )
+
+            # Zet alle punten op dezelfde plek en laat ze overlappen: 'bubble' style
+            fig_wc.update_traces(textposition="middle center", marker=dict(line=dict(width=1, color="DarkSlateGrey")))
+            fig_wc.update_layout(
+                xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+                yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+                title="Labelgebruik (grote woorden = vaker aangeduid)",
+                showlegend=False,
+                height=500
+            )
+
+            st.plotly_chart(fig_wc, use_container_width=True)
+
 
 
 # -------------------------------------------------
@@ -371,6 +388,7 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
