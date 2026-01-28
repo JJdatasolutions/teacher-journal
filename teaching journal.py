@@ -169,6 +169,132 @@ if user["role"] == "teacher":
                 st.session_state.stress = 3
                 st.rerun()
 
+    # ---------------- LESREGISTRATIE ----------------
+with tab2:
+    with st.form("lesregistratie"):
+        klas = st.text_input("Klas / Groep", key="klas_input")
+
+        st.slider("Lesaanpak", 1, 5, key="lesaanpak")
+        st.caption("Zeer onduidelijk · Onvoldoende · Oké · Duidelijk · Zeer sterk")
+
+        st.slider("Klasmanagement", 1, 5, key="klasmanagement")
+        st.caption("Chaotisch · Moeizaam · Redelijk · Goed · Zeer sterk")
+
+        positief = st.multiselect(
+            "Positieve sfeer (meerdere mogelijk)",
+            POS_MOODS,
+            key="pos_moods"
+        )
+
+        negatief = st.multiselect(
+            "Negatieve sfeer (meerdere mogelijk)",
+            NEG_MOODS,
+            key="neg_moods"
+        )
+
+        if st.form_submit_button("Les opslaan"):
+            if not klas:
+                st.error("Vul een klas of groep in.")
+            else:
+                les_df.loc[len(les_df)] = [
+                    date.today(),
+                    klas,
+                    st.session_state.lesaanpak,
+                    st.session_state.klasmanagement,
+                    ", ".join(positief),
+                    ", ".join(negatief)
+                ]
+                les_df.to_csv(LES_FILE, index=False)
+                st.success("Les succesvol geregistreerd!")
+
+                st.session_state.lesaanpak = 3
+                st.session_state.klasmanagement = 3
+                st.session_state.pos_moods = []
+                st.session_state.neg_moods = []
+
+                st.rerun()
+
+    # ---------------- VISUALISATIES ----------------
+with tab3:
+    st.subheader("📈 Trends over tijd")
+
+    if day_df.empty:
+        st.info("Nog geen dagregistraties beschikbaar.")
+    else:
+        day_plot = day_df.sort_values("Datum")
+
+        fig1 = px.line(
+            day_plot,
+            x="Datum",
+            y=["Energie", "Stress"],
+            markers=True,
+            title="Energie & Stress over tijd"
+        )
+        st.plotly_chart(fig1, use_container_width=True)
+
+    st.divider()
+    st.subheader("📊 Leskwaliteit")
+
+    if les_df.empty:
+        st.info("Nog geen lesregistraties beschikbaar.")
+    else:
+        les_plot = les_df.sort_values("Datum")
+
+        fig2 = px.bar(
+            les_plot,
+            x="Datum",
+            y=["Lesaanpak", "Klasmanagement"],
+            barmode="group",
+            title="Lesaanpak & Klasmanagement per les"
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+
+    st.divider()
+    st.subheader("😊 Sfeerwoorden (frequentie)")
+
+    if not les_df.empty:
+        pos_counts = (
+            les_df["Positief"]
+            .dropna()
+            .str.split(", ")
+            .explode()
+            .value_counts()
+        )
+
+        neg_counts = (
+            les_df["Negatief"]
+            .dropna()
+            .str.split(", ")
+            .explode()
+            .value_counts()
+        )
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if not pos_counts.empty:
+                fig3 = px.bar(
+                    pos_counts,
+                    x=pos_counts.index,
+                    y=pos_counts.values,
+                    title="Positieve sfeer"
+                )
+                st.plotly_chart(fig3, use_container_width=True)
+            else:
+                st.info("Nog geen positieve labels.")
+
+        with col2:
+            if not neg_counts.empty:
+                fig4 = px.bar(
+                    neg_counts,
+                    x=neg_counts.index,
+                    y=neg_counts.values,
+                    title="Negatieve sfeer"
+                )
+                st.plotly_chart(fig4, use_container_width=True)
+            else:
+                st.info("Nog geen negatieve labels.")
+
     # ---------------- PDF ----------------
     with tab4:
         today = date.today()
@@ -193,4 +319,5 @@ if user["role"] == "teacher":
 
                 with open(pdf_path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
