@@ -207,6 +207,8 @@ with tab2:
 # -------------------------------------------------
 # VISUALISATIES
 # -------------------------------------------------
+import plotly.graph_objects as go  # Zorg dat dit bovenaan staat in je code
+
 with tab3:
     st.header("📊 Visualisaties")
 
@@ -232,10 +234,7 @@ with tab3:
         # -----------------------------
         st.subheader("📘 Gemiddelde lesaanpak")
 
-        avg_lesaanpak = (
-            df.groupby("Klas", as_index=False)["Lesaanpak"]
-            .mean()
-        )
+        avg_lesaanpak = df.groupby("Klas", as_index=False)["Lesaanpak"].mean()
 
         fig_bar = px.bar(
             avg_lesaanpak,
@@ -252,19 +251,14 @@ with tab3:
         # -----------------------------
         st.subheader("🧭 Labelgebruik (frequentie)")
 
-        if "Labels" not in df.columns:
+        if "Positief" not in df.columns or "Negatief" not in df.columns:
             st.warning("Geen labels beschikbaar in de data.")
         else:
-            # Labels opsplitsen
-            label_series = (
-                df["Labels"]
-                .dropna()
-                .astype(str)
-                .str.split(",")
-                .explode()
-                .str.strip()
-            )
+            # Alle labels opsplitsen en combineren
+            positief_series = df["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
+            negatief_series = df["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
 
+            label_series = pd.concat([positief_series, negatief_series])
             if label_series.empty:
                 st.info("Nog geen labels aangeduid.")
             else:
@@ -275,30 +269,29 @@ with tab3:
                 # POSITIEF / NEGATIEF DEFINIËREN
                 # -----------------------------
                 positieve_labels = [
-                    Inspirerend", "Motiverend", "Actief", "Verbonden", "Respectvol", "Gefocust", "Veilig", "Energiek"
-                ]
-
-
+                    "Inspirerend", "Motiverend", "Actief", "Verbonden",
+                    "Respectvol", "Gefocust", "Veilig", "Energiek"
                 ]
                 negatieve_labels = [
-                   "Demotiverend", "Passief", "Onrespectvol", "Chaotisch", "Afgeleid", "Spannend", "Onveilig"
+                    "Demotiverend", "Passief", "Onrespectvol", "Chaotisch",
+                    "Afgeleid", "Spannend", "Onveilig"
                 ]
 
                 def label_kleur(label):
                     if label in positieve_labels:
-                        return px.colors.sequential.Greens[
-                            positieve_labels.index(label) % len(px.colors.sequential.Greens)
-                        ]
+                        idx = positieve_labels.index(label) % len(px.colors.sequential.Greens)
+                        return px.colors.sequential.Greens[idx]
                     elif label in negatieve_labels:
-                        return px.colors.sequential.Reds[
-                            negatieve_labels.index(label) % len(px.colors.sequential.Reds)
-                        ]
+                        idx = negatieve_labels.index(label) % len(px.colors.sequential.Reds)
+                        return px.colors.sequential.Reds[idx]
                     else:
                         return "#888888"  # neutraal
 
                 label_counts["Kleur"] = label_counts["Label"].apply(label_kleur)
 
-                # Radar chart
+                # -----------------------------
+                # RADAR CHART
+                # -----------------------------
                 fig_radar = go.Figure()
 
                 for _, row in label_counts.iterrows():
@@ -321,7 +314,6 @@ with tab3:
                 )
 
                 st.plotly_chart(fig_radar, use_container_width=True)
-
 
 # -------------------------------------------------
 # PDF – VORIGE MAAND
@@ -356,5 +348,6 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
