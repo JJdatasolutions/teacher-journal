@@ -291,21 +291,29 @@ with tab3:
             all_labels = all_labels[all_labels["Label"] != ""]
 
             if not all_labels.empty:
-                label_counts = all_labels.groupby(["Label","Type"]).size().reset_index(name="Aantal")
-                words_freq = dict(zip(label_counts["Label"], label_counts["Aantal"]))
-                label_color = dict(zip(label_counts["Label"],
-                                       ["green" if t=="Positief" else "red" for t in label_counts["Type"]]))
+    # verwijder lege of nan labels
+    all_labels = all_labels[all_labels["Label"].astype(bool)]
+    label_counts = all_labels.groupby(["Label","Type"]).size().reset_index(name="Aantal")
+    words_freq = dict(zip(label_counts["Label"], label_counts["Aantal"]))
+    label_color = dict(zip(label_counts["Label"],
+                           ["green" if t=="Positief" else "red" for t in label_counts["Type"]]))
+    
+    if words_freq:  # alleen genereren als er minstens 1 label is
+        wc = WordCloud(
+            width=400, height=400, background_color="white",
+            prefer_horizontal=0.9, min_font_size=10, max_font_size=100,
+            random_state=42
+        ).generate_from_frequencies(words_freq)
 
-                wc = WordCloud(width=400, height=400, background_color="white",
-                               prefer_horizontal=0.9, min_font_size=10, max_font_size=100,
-                               random_state=42).generate_from_frequencies(words_freq)
+        fig, ax = plt.subplots(figsize=(6,6))
+        ax.imshow(wc.recolor(color_func=lambda w, **kw: label_color.get(w,"black")), interpolation="bilinear")
+        ax.axis("off")
+        st.pyplot(fig)
+    else:
+        st.info("Geen labels beschikbaar om WordCloud te genereren.")
+else:
+    st.info("Geen labels beschikbaar om WordCloud te genereren.")
 
-                fig, ax = plt.subplots(figsize=(6,6))
-                ax.imshow(wc.recolor(color_func=lambda w, **kwargs: label_color.get(w,"black")), interpolation="bilinear")
-                ax.axis("off")
-                st.pyplot(fig)
-            else:
-                st.info("Nog geen labels aangeduid.")
 
         # -----------------------------
         # ONDER: Vergelijking van 2 klassen
@@ -394,6 +402,7 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
