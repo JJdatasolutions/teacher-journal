@@ -87,73 +87,86 @@ def draw_ridgeline_artistic(df, kolom, titel, basis_kleur_naam="Teal"):
     )
     return fig
 
-def draw_sankey_artistic(df):
+def draw_sankey_butterfly(df):
     """
-    Een organische flow chart, geoptimaliseerd voor leesbaarheid.
+    Creëert een Butterfly Sankey: Negatief (links) -> Klassen (midden) -> Positief (rechts).
     """
     if df.empty: return None
     
-    # 1. Data voorbereiden
-    temp = df.copy()
-    temp['Positief'] = temp['Positief'].astype(str).str.split(',')
-    temp = temp.explode('Positief')
-    temp['Positief'] = temp['Positief'].str.strip()
-    # Filter lege waarden en 'nan' strings
-    temp = temp[(temp['Positief'] != 'nan') & (temp['Positief'] != '')]
-    
-    counts = temp.groupby(['Klas', 'Positief']).size().reset_index(name='Aantal')
-    if counts.empty: return None
-    
-    # 2. Nodes bepalen
-    klassen_uniek = list(counts['Klas'].unique())
-    labels_uniek = list(counts['Positief'].unique())
-    all_nodes = klassen_uniek + labels_uniek
-    node_map = {name: i for i, name in enumerate(all_nodes)}
-    
-    # 3. Kleuren logica (Grijs voor klassen, Pastel voor labels)
-    colors_nodes = ["#636e72"] * len(klassen_uniek) + px.colors.qualitative.Pastel[:len(labels_uniek)]
-    
-    # 4. Link kleuren (Semi-transparant op basis van doelkleur)
-    final_link_colors = []
-    for _, row in counts.iterrows():
-        label_idx = labels_uniek.index(row['Positief'])
-        # Pak de kleur uit de pastel lijst, roteer als er meer labels zijn dan kleuren
-        base_color = px.colors.qualitative.Pastel[label_idx % len(px.colors.qualitative.Pastel)]
-        
-        # Zet hex om naar rgba met 0.4 opacity (zachter effect)
-        if base_color.startswith("#"):
-            r, g, b = tuple(int(base_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
-            final_link_colors.append(f"rgba({r},{g},{b}, 0.4)")
-        else:
-            final_link_colors.append("rgba(200,200,200,0.4)")
+    # 1. Data Voorbereiding
+    def clean_labels(df, kolom):
+        temp = df.copy()
+        temp[kolom] = temp[kolom].astype(str).str.split(',')
+        temp = temp.explode(kolom)
+        temp[kolom] = temp[kolom].str.strip()
+        return temp[(temp[kolom] != 'nan') & (temp[kolom] != '')]
 
-    # 5. Bepaal dynamische hoogte (belangrijk voor leesbaarheid!)
-    # Minimaal 500px, maar voeg 40px toe per extra label als het er veel zijn
-    dynamic_height = max(500, len(all_nodes) * 40)
+    df_pos = clean_labels(df, 'Positief')
+    df_neg = clean_labels(df, 'Negatief')
+
+    counts_pos = df_pos.groupby(['Klas', 'Positief']).size().reset_index(name='Aantal')
+    counts_neg = df_neg.groupby(['Negatief', 'Klas']).size().reset_index(name='Aantal')
+
+    # 2. Nodes bepalen (Negatief -> Klassen -> Positief)
+    neg_uniek = sorted(list(counts_neg['Negatief'].unique()))
+    klassen_uniek = sorted(list(df['Klas'].unique()))
+    pos_uniek = sorted(list(counts_pos['Positief'].unique()))
+    
+    all_nodes = neg_uniek + klassen_uniek + pos_uniek
+    node_map = {name: i for i, name in enumerate(all_nodes)}
+
+    # 3. Kleuren voor de Nodes
+    # Roodachtig voor negatief, Grijs voor klassen, Groenachtig voor positief
+    node_colors = (["#ff7675"] * len(neg_uniek) + 
+                   ["#636e72"] * len(klassen_uniek) + 
+                   ["#55efc4"] * len(pos_uniek))
+
+    # 4. Links opbouwen
+    sources = []
+    targets = []
+    values = []
+    link_colors = []
+
+    # Negatief -> Klas (Links naar Midden)
+    for _, row in counts_neg.iterrows():
+        sources.append(node_map[row['Negatief']])
+        targets.append(node_map[row['Klas']])
+        values.append(row['Aantal'])
+        link_colors.append("rgba(214, 48, 49, 0.3)") # Transparant rood
+
+    # Klas -> Positief (Midden naar Rechts)
+    for _, row in counts_pos.iterrows():
+        sources.append(node_map[row['Klas']])
+        targets.append(node_map[row['Positief']])
+        values.append(row['Aantal'])
+        link_colors.append("rgba(0, 184, 148, 0.3)") # Transparant groen
+
+    # 5. Dynamische Hoogte
+    dynamic_height = max(600, len(all_nodes) * 35)
 
     fig = go.Figure(data=[go.Sankey(
-        textfont=dict(size=14, color="black", family="Arial Black"), # Duidelijkere tekst
+        textfont=dict(size=13, color="black", family="Arial Black"),
         node = dict(
-          pad = 40,             # Meer ruimte tussen de blokjes
-          thickness = 25,       # Iets dikkere blokjes om de tekst 'vast' te houden
+          pad = 35, thickness = 20,
           line = dict(color = "white", width = 1),
-          label = [f" {name} " for name in all_nodes], # Spaties voor betere uitlijning
-          color = colors_nodes
+          label = [f" {n} " for n in all_nodes],
+          color = node_colors
         ),
         link = dict(
-          source = counts['Klas'].map(node_map),
-          target = counts['Positief'].map(node_map),
-          value = counts['Aantal'],
-          color = final_link_colors
-    ))])
-    
+          source = sources,
+          target = targets,
+          value = values,
+          color = link_colors
+        )
+    )])
+
     fig.update_layout(
-        title=dict(text="🌊 Emotionele Stromen", font=dict(size=20)),
-        height=dynamic_height,  # Hier passen we de hoogte aan
-        font=dict(size=14),     # Algemene fontgrootte omhoog
+        title=dict(text="⚖️ Balans per Klas: Negatief vs Positief", font=dict(size=22)),
+        height=dynamic_height,
+        font=dict(size=12),
+        margin=dict(l=40, r=40, t=80, b=40),
         plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        margin=dict(l=20, r=20, t=60, b=40) # Marges zodat tekst niet van het scherm valt
+        paper_bgcolor='rgba(0,0,0,0)'
     )
     return fig
 # -------------------------------------------------
@@ -574,5 +587,6 @@ else:
 
                 with open(path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
