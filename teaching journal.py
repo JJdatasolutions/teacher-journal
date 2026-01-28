@@ -266,7 +266,6 @@ with tab3:
     def color_func(word, **kwargs):
         return label_color.get(word,"black")
 
-    c1, c2 = st.columns([1,1])
     with c1:
         st.markdown("**📌 Alle leslabels**")
         wc = WordCloud(width=400, height=300, background_color="white").generate_from_frequencies(words_freq)
@@ -415,6 +414,7 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
