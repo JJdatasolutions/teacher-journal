@@ -196,9 +196,10 @@ with tab2:
             if (c3 if i % 2 == 0 else c4).checkbox(m, key=f"n_{m}"):
                 negatief.append(m)
 
-        if st.form_submit_button("Les opslaan"):
+       if st.form_submit_button("Les opslaan"):
     # Unieke timestamp voor deze registratie
     timestamp = pd.Timestamp.now()
+    
     new_row = {
         "Datum": timestamp,
         "Klas": klas,
@@ -207,12 +208,14 @@ with tab2:
         "Positief": ", ".join(positief),
         "Negatief": ", ".join(negatief)
     }
+    
     # Voeg toe aan dataframe
     les_df = pd.concat([les_df, pd.DataFrame([new_row])], ignore_index=True)
+    
     # Opslaan naar CSV
     les_df.to_csv(LES_FILE, index=False)
+    
     st.success("Les opgeslagen ✔️")
-
 
 # -----------------------------
 # VISUALISATIES
@@ -357,6 +360,7 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
