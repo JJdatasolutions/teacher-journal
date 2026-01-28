@@ -182,53 +182,58 @@ if user["role"] == "teacher":
 
     # ---------------- LESREGISTRATIE ----------------
 # ---------------- LESREGISTRATIE ----------------
+# ---------------- LESREGISTRATIE ----------------
 with tab2:
-    with st.form("lesregistratie"):
+    with st.form("lesregistratie", clear_on_submit=True):
+
         klas = st.selectbox(
             "Klas / Groep",
-            KLASSEN,
-            key="klas_select"
+            KLASSEN
         )
 
-        st.slider("Lesaanpak", 1, 5, key="lesaanpak")
-        st.caption("1 = sloeg niet aan · 2 = zwak · 3 = oké · 4 = goed · 5 = zeer sterk")
+        lesaanpak = st.slider(
+            "Lesaanpak",
+            1, 5, 3
+        )
+        st.caption(
+            "1 = mijn aanpak werkte helemaal niet · "
+            "3 = redelijk · "
+            "5 = mijn aanpak was een groot succes bij deze groep"
+        )
 
-        st.slider("Klasmanagement", 1, 5, key="klasmanagement")
-        st.caption("1 = chaotisch · 2 = moeizaam · 3 = oké · 4 = goed · 5 = zeer sterk")
+        klasmanagement = st.slider(
+            "Klasmanagement",
+            1, 5, 3
+        )
+        st.caption(
+            "1 = het lukte mij helemaal niet deze klas bij de les te houden · "
+            "3 = wisselend · "
+            "5 = ik hield deze klas met gemak bij de les"
+        )
 
         positief = st.multiselect(
             "Positieve lesmood",
-            POS_MOODS,
-            key="pos_moods"
+            POS_MOODS
         )
 
         negatief = st.multiselect(
             "Negatieve lesmood",
-            NEG_MOODS,
-            key="neg_moods"
+            NEG_MOODS
         )
 
         if st.form_submit_button("Les opslaan"):
             les_df.loc[len(les_df)] = [
                 date.today(),
                 klas,
-                st.session_state.lesaanpak,
-                st.session_state.klasmanagement,
+                lesaanpak,
+                klasmanagement,
                 ", ".join(positief),
                 ", ".join(negatief)
             ]
 
             les_df.to_csv(LES_FILE, index=False)
-            st.success("Les succesvol opgeslagen!")
+            st.success("Les opgeslagen ✔️")
 
-            st.session_state.lesaanpak = 3
-            st.session_state.klasmanagement = 3
-            st.session_state.pos_moods = []
-            st.session_state.neg_moods = []
-
-            st.rerun()
-
-    # ---------------- VISUALISATIES ----------------
 # ---------------- VISUALISATIES ----------------
 with tab3:
     st.subheader("📊 Gemiddelde leskwaliteit per klas")
@@ -316,6 +321,7 @@ with tab3:
 
                 with open(pdf_path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
