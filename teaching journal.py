@@ -197,12 +197,22 @@ with tab2:
                 negatief.append(m)
 
         if st.form_submit_button("Les opslaan"):
-            les_df.loc[len(les_df)] = [
-                date.today(), klas, lesaanpak, klasmanagement,
-                ", ".join(positief), ", ".join(negatief)
-            ]
-            les_df.to_csv(LES_FILE, index=False)
-            st.success("Les opgeslagen ✔️")
+    # Unieke timestamp voor deze registratie
+    timestamp = pd.Timestamp.now()
+    new_row = {
+        "Datum": timestamp,
+        "Klas": klas,
+        "Lesaanpak": lesaanpak,
+        "Klasmanagement": klasmanagement,
+        "Positief": ", ".join(positief),
+        "Negatief": ", ".join(negatief)
+    }
+    # Voeg toe aan dataframe
+    les_df = pd.concat([les_df, pd.DataFrame([new_row])], ignore_index=True)
+    # Opslaan naar CSV
+    les_df.to_csv(LES_FILE, index=False)
+    st.success("Les opgeslagen ✔️")
+
 
 # -----------------------------
 # VISUALISATIES
@@ -347,6 +357,7 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
