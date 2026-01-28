@@ -221,165 +221,129 @@ with tab2:
 # -----------------------------
 # VISUALISATIES
 # -----------------------------
-import plotly.express as px
+import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 
 with tab3:
     st.header("📊 Visualisaties")
 
-    # -----------------------------
-    # DAGGEVOEL LIJNGRAFIEK
-    # -----------------------------
-    st.subheader("📈 Daggevoel (Energie & Stress)")
-    day_df_clean = day_df.copy()
-    day_df_clean["Datum"] = pd.to_datetime(day_df_clean["Datum"], errors="coerce")
-    day_df_clean = day_df_clean.dropna(subset=["Datum"])
-    if not day_df_clean.empty:
-        fig_line = px.line(
-            day_df_clean.sort_values("Datum"),
-            x="Datum",
-            y=["Energie","Stress"],
-            markers=True,
-            title="Daggevoel door de tijd"
-        )
-        fig_line.update_layout(yaxis_range=[1,5])
-        st.plotly_chart(fig_line, use_container_width=True)
+    if les_df.empty:
+        st.info("Nog geen lesdata beschikbaar.")
     else:
-        st.info("Nog geen daggevoel geregistreerd.")
-
-    # -----------------------------
-    # ALGEMENE STATISTIEKEN
-    # -----------------------------
-    st.subheader("📌 Algemene data overzicht (alle klassen)")
-
-    # Alle labels voor WordCloud
-    pos_series = les_df["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
-    neg_series = les_df["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
-    all_labels = pd.concat([
-        pd.DataFrame({"Label": pos_series, "Type": "Positief"}),
-        pd.DataFrame({"Label": neg_series, "Type": "Negatief"})
-    ])
-    label_counts = all_labels.groupby(["Label","Type"]).size().reset_index(name="Aantal")
-    words_freq = dict(zip(label_counts["Label"], label_counts["Aantal"]))
-    label_color = dict(zip(label_counts["Label"], ["green" if t=="Positief" else "red" for t in label_counts["Type"]]))
-    def color_func(word, **kwargs):
-        return label_color.get(word,"black")
-
-    with c1:
-        st.markdown("**📌 Alle leslabels**")
-        wc = WordCloud(width=400, height=300, background_color="white").generate_from_frequencies(words_freq)
-        fig, ax = plt.subplots(figsize=(6,4))
-        ax.imshow(wc.recolor(color_func=color_func, random_state=42), interpolation="bilinear")
-        ax.axis("off")
-        st.pyplot(fig)
-
-    with c2:
-        st.markdown("**📌 Gemiddelde Lesaanpak & Klasmanagement (alle klassen)**")
-        avg_bar = les_df.groupby("Klas")[["Lesaanpak","Klasmanagement"]].mean().reset_index()
-        fig_bar = px.bar(
-            avg_bar,
-            y=["Lesaanpak","Klasmanagement"],
-            x=avg_bar["Klas"],
-            barmode="group",
-            text_auto=".2f",
-            orientation="v",
-            title="Gemiddelde score per klas"
-        )
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-    # -----------------------------
-    # KLASVERGELIJKING (alleen 2 klassen)
-    # -----------------------------
-    st.subheader("⚖️ Vergelijking tussen 2 klassen")
-
-if not les_df.empty:
-    klassen = sorted(les_df["Klas"].dropna().unique().tolist())  # <-- voeg dit toe
-    klas_keuze = st.multiselect(
-        "Selecteer 2 klassen om te vergelijken:",
-        klassen,
-        default=klassen[:2]
-    )
-
-    if len(klas_keuze) == 2:
-        k1, k2 = klas_keuze
-        df1 = les_df[les_df["Klas"] == k1]
-        df2 = les_df[les_df["Klas"] == k2]
-        # ... hier komt de rest van de kolommen met WordCloud + bar chart
-
-
-        c1, c2 = st.columns(2)
-
         # -----------------------------
-        # Links: klas 1
+        # Algemene WordCloud (alle klassen)
         # -----------------------------
-        with c1:
-            st.markdown(f"**{k1}**")
-            # WordCloud labels
-            pos1 = df1["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
-            neg1 = df1["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
-            all1 = pd.concat([
-                pd.DataFrame({"Label": pos1, "Type":"Positief"}),
-                pd.DataFrame({"Label": neg1, "Type":"Negatief"})
+        st.subheader("🖌 Algemene WordCloud (alle registraties)")
+
+        positief_series = les_df["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
+        negatief_series = les_df["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
+
+        if positief_series.empty and negatief_series.empty:
+            st.info("Nog geen labels aangeduid.")
+        else:
+            all_labels = pd.concat([
+                pd.DataFrame({"Label": positief_series, "Type": "Positief"}),
+                pd.DataFrame({"Label": negatief_series, "Type": "Negatief"})
             ])
-            counts1 = all1.groupby(["Label","Type"]).size().reset_index(name="Aantal")
-            words_freq1 = dict(zip(counts1["Label"], counts1["Aantal"]))
-            label_color1 = dict(zip(counts1["Label"], ["green" if t=="Positief" else "red" for t in counts1["Type"]]))
-            wc1 = WordCloud(width=400, height=300, background_color="white").generate_from_frequencies(words_freq1)
-            fig, ax = plt.subplots(figsize=(6,4))
-            ax.imshow(wc1.recolor(color_func=lambda w, **kw: label_color1.get(w,"black")), interpolation="bilinear")
-            ax.axis("off")
-            st.pyplot(fig)
+            label_counts = all_labels.groupby(["Label", "Type"]).size().reset_index(name="Aantal")
 
-            # Bar chart
-            avg1 = df1[["Lesaanpak","Klasmanagement"]].mean().reset_index()
-            avg1.columns = ["Type","Score"]
-            fig_bar1 = px.bar(
-                avg1,
-                x="Score",
-                y="Type",
-                orientation="h",
-                text_auto=".2f",
-                title=f"{k1} Gemiddelde scores",
-                range_x=[1,5]
-            )
-            st.plotly_chart(fig_bar1, use_container_width=True)
+            if not label_counts.empty:
+                words_freq = dict(zip(label_counts["Label"], label_counts["Aantal"]))
+                label_color = dict(zip(label_counts["Label"],
+                                       ["green" if t=="Positief" else "red" for t in label_counts["Type"]]))
+
+                wc = WordCloud(
+                    width=800,
+                    height=400,
+                    background_color="white",
+                    prefer_horizontal=0.9,
+                    min_font_size=10,
+                    max_font_size=100,
+                    random_state=42
+                ).generate_from_frequencies(words_freq)
+
+                fig, ax = plt.subplots(figsize=(12,6))
+                ax.imshow(wc.recolor(color_func=lambda w, **kw: label_color.get(w,"black")), interpolation="bilinear")
+                ax.axis("off")
+                st.pyplot(fig)
 
         # -----------------------------
-        # Rechts: klas 2
+        # KLAS VERGELIJKING
         # -----------------------------
-        with c2:
-            st.markdown(f"**{k2}**")
-            pos2 = df2["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
-            neg2 = df2["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
-            all2 = pd.concat([
-                pd.DataFrame({"Label": pos2, "Type":"Positief"}),
-                pd.DataFrame({"Label": neg2, "Type":"Negatief"})
-            ])
-            counts2 = all2.groupby(["Label","Type"]).size().reset_index(name="Aantal")
-            words_freq2 = dict(zip(counts2["Label"], counts2["Aantal"]))
-            label_color2 = dict(zip(counts2["Label"], ["green" if t=="Positief" else "red" for t in counts2["Type"]]))
-            wc2 = WordCloud(width=400, height=300, background_color="white").generate_from_frequencies(words_freq2)
-            fig, ax = plt.subplots(figsize=(6,4))
-            ax.imshow(wc2.recolor(color_func=lambda w, **kw: label_color2.get(w,"black")), interpolation="bilinear")
-            ax.axis("off")
-            st.pyplot(fig)
+        st.subheader("🔀 Vergelijking van 2 klassen")
 
-            # Bar chart
-            avg2 = df2[["Lesaanpak","Klasmanagement"]].mean().reset_index()
-            avg2.columns = ["Type","Score"]
-            fig_bar2 = px.bar(
-                avg2,
-                x="Score",
-                y="Type",
-                orientation="h",
-                text_auto=".2f",
-                title=f"{k2} Gemiddelde scores",
-                range_x=[1,5]
-            )
-            st.plotly_chart(fig_bar2, use_container_width=True)
+        klassen_uniek = sorted(les_df["Klas"].dropna().unique())
+        if len(klassen_uniek) < 2:
+            st.info("Minstens 2 klassen nodig voor vergelijking.")
+        else:
+            k1, k2 = st.columns(2)
+            klas_keuze = st.multiselect("Selecteer exact 2 klassen om te vergelijken:", klassen_uniek, default=klassen_uniek[:2])
 
+            if len(klas_keuze) != 2:
+                st.info("Selecteer precies 2 klassen.")
+            else:
+                df1 = les_df[les_df["Klas"] == klas_keuze[0]].copy()
+                df2 = les_df[les_df["Klas"] == klas_keuze[1]].copy()
 
+                # --------- Horizontal Bar Chart -------------
+                combined_df = pd.DataFrame({
+                    "Klas": klas_keuze * 2,
+                    "Categorie": ["Lesaanpak", "Klasmanagement"]*2,
+                    "Score": [
+                        df1["Lesaanpak"].mean(), df1["Klasmanagement"].mean(),
+                        df2["Lesaanpak"].mean(), df2["Klasmanagement"].mean()
+                    ]
+                })
+
+                fig_bar = px.bar(
+                    combined_df,
+                    y="Categorie",
+                    x="Score",
+                    color="Klas",
+                    orientation="h",
+                    text_auto=".2f",
+                    barmode="group",
+                    title="Gemiddelde Lesaanpak & Klasmanagement per klas"
+                )
+                fig_bar.update_layout(xaxis_range=[1,5])
+                st.plotly_chart(fig_bar, use_container_width=True)
+
+                # --------- WordClouds per klas -------------
+                col1, col2 = st.columns(2)
+
+                for df, klas_name, col in zip([df1, df2], klas_keuze, [col1, col2]):
+                    positief_series = df["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
+                    negatief_series = df["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
+
+                    if positief_series.empty and negatief_series.empty:
+                        col.info(f"Geen labels beschikbaar voor {klas_name}")
+                    else:
+                        all_labels = pd.concat([
+                            pd.DataFrame({"Label": positief_series, "Type": "Positief"}),
+                            pd.DataFrame({"Label": negatief_series, "Type": "Negatief"})
+                        ])
+                        label_counts = all_labels.groupby(["Label", "Type"]).size().reset_index(name="Aantal")
+
+                        if not label_counts.empty:
+                            words_freq = dict(zip(label_counts["Label"], label_counts["Aantal"]))
+                            label_color = dict(zip(label_counts["Label"],
+                                                   ["green" if t=="Positief" else "red" for t in label_counts["Type"]]))
+
+                            wc = WordCloud(
+                                width=400,
+                                height=400,
+                                background_color="white",
+                                prefer_horizontal=0.9,
+                                min_font_size=10,
+                                max_font_size=100,
+                                random_state=42
+                            ).generate_from_frequencies(words_freq)
+
+                            fig, ax = plt.subplots(figsize=(6,6))
+                            ax.imshow(wc.recolor(color_func=lambda w, **kw: label_color.get(w,"black")), interpolation="bilinear")
+                            ax.axis("off")
+                            col.pyplot(fig)
 
 # -------------------------------------------------
 # PDF – VORIGE MAAND
@@ -414,6 +378,7 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
