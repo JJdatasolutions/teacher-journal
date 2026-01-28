@@ -8,12 +8,12 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
 # -------------------------------------------------
-# CONFIG
+# CONFIG (mobile first)
 # -------------------------------------------------
 st.set_page_config(
     page_title="Leerkrachtenmonitor",
     page_icon="❤️",
-    layout="centered"  # mobile first
+    layout="centered"
 )
 
 DATA_DIR = "data"
@@ -47,20 +47,6 @@ def save_users(df):
     df.to_csv(USERS_FILE, index=False)
 
 # -------------------------------------------------
-# SESSION STATE INIT
-# -------------------------------------------------
-defaults = {
-    "energie": 3,
-    "stress": 3,
-    "lesaanpak": 3,
-    "klasmanagement": 3,
-    "remember": False
-}
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
-
-# -------------------------------------------------
 # AUTO LOGIN (permanent)
 # -------------------------------------------------
 params = st.query_params
@@ -83,7 +69,7 @@ if "user" not in st.session_state:
     with tab1:
         email = normalize_email(st.text_input("E-mail", key="login_email"))
         pw = st.text_input("Wachtwoord", type="password", key="login_pw")
-        remember = st.checkbox("Onthoud mij", key="remember_me")
+        remember = st.checkbox("Onthoud mij")
 
         if st.button("Inloggen"):
             u = users[users.email == email]
@@ -122,229 +108,134 @@ if st.sidebar.button("Uitloggen"):
     st.rerun()
 
 # -------------------------------------------------
-# MOODS
+# CONSTANTEN
 # -------------------------------------------------
-POS_MOODS = ["Inspirerend", "Motiverend", "Actief", "Verbonden", "Respectvol", "Gefocust"]
-NEG_MOODS = ["Demotiverend", "Passief", "Onrespectvol", "Chaotisch", "Afgeleid"]
+POS_MOODS = [
+    "Inspirerend", "Motiverend", "Actief", "Verbonden",
+    "Respectvol", "Gefocust", "Veilig", "Energiek"
+]
+
+NEG_MOODS = [
+    "Demotiverend", "Passief", "Onrespectvol",
+    "Chaotisch", "Afgeleid", "Spannend", "Onveilig"
+]
+
 KLASSEN = [
-    "5ECWI",
-    "5HW",
-    "5ECMT",
-    "5MT",
-    "3HW",
-    "6ECWI-HW",
-    "6MT",
-    "6WEWI",
-    "6ECMT"
+    "5ECWI", "5HW", "5ECMT", "5MT", "3HW",
+    "6ECWI-HW", "6MT", "6WEWI", "6ECMT"
 ]
 
 # -------------------------------------------------
 # TEACHER VIEW
 # -------------------------------------------------
-if user["role"] == "teacher":
-    DAY_FILE = day_file(user["email"])
-    LES_FILE = lesson_file(user["email"])
+DAY_FILE = day_file(user["email"])
+LES_FILE = lesson_file(user["email"])
 
-    if not os.path.exists(DAY_FILE):
-        pd.DataFrame(columns=["Datum", "Energie", "Stress"]).to_csv(DAY_FILE, index=False)
+if not os.path.exists(DAY_FILE):
+    pd.DataFrame(columns=["Datum", "Energie", "Stress"]).to_csv(DAY_FILE, index=False)
 
-    if not os.path.exists(LES_FILE):
-        pd.DataFrame(columns=[
-            "Datum", "Klas", "Lesaanpak", "Klasmanagement", "Positief", "Negatief"
-        ]).to_csv(LES_FILE, index=False)
+if not os.path.exists(LES_FILE):
+    pd.DataFrame(columns=[
+        "Datum", "Klas", "Lesaanpak", "Klasmanagement", "Positief", "Negatief"
+    ]).to_csv(LES_FILE, index=False)
 
-    day_df = pd.read_csv(DAY_FILE)
-    day_df["Datum"] = pd.to_datetime(day_df["Datum"], errors="coerce")
+day_df = pd.read_csv(DAY_FILE)
+day_df["Datum"] = pd.to_datetime(day_df["Datum"], errors="coerce")
+day_df = day_df.dropna(subset=["Datum"])
 
-    les_df = pd.read_csv(LES_FILE)
-    les_df["Datum"] = pd.to_datetime(les_df["Datum"], errors="coerce")
+les_df = pd.read_csv(LES_FILE)
+les_df["Datum"] = pd.to_datetime(les_df["Datum"], errors="coerce")
+les_df = les_df.dropna(subset=["Datum"])
 
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "🧠 Daggevoel", "📝 Lesregistratie", "📊 Visualisaties", "📄 Maandrapport"
-    ])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🧠 Daggevoel", "📝 Lesregistratie", "📊 Visualisaties", "📄 Maandrapport"
+])
 
-    # ---------------- DAGGEVOEL ----------------
-   # ---------------- DAGGEVOEL ----------------
+# -------------------------------------------------
+# DAGGEVOEL
+# -------------------------------------------------
 with tab1:
     with st.form("daggevoel", clear_on_submit=True):
-
         d = st.date_input("Datum", date.today())
 
-        energie = st.slider(
-            "Energie",
-            1, 5, 3
-        )
-        st.caption(
-            "1 = uitgeput · "
-            "2 = weinig energie · "
-            "3 = oké · "
-            "4 = veel energie · "
-            "5 = barstend van energie"
-        )
+        energie = st.slider("Energie", 1, 5, 3)
+        st.caption("1 = uitgeput · 5 = barstend van energie")
 
-        stress = st.slider(
-            "Stress",
-            1, 5, 3
-        )
-        st.caption(
-            "1 = volkomen rustig · "
-            "2 = licht gespannen · "
-            "3 = gemiddeld · "
-            "4 = erg gestresseerd · "
-            "5 = enorm gestresseerd"
-        )
+        stress = st.slider("Stress", 1, 5, 3)
+        st.caption("1 = volkomen rustig · 5 = enorm gestresseerd")
 
         if st.form_submit_button("Opslaan"):
-            day_df.loc[len(day_df)] = [
-                d,
-                energie,
-                stress
-            ]
+            day_df.loc[len(day_df)] = [d, energie, stress]
             day_df.to_csv(DAY_FILE, index=False)
             st.success("Geregistreerd! ✔️")
-# ---------------- LESREGISTRATIE ----------------
-# ---------------- LESREGISTRATIE ----------------
+
+# -------------------------------------------------
+# LESREGISTRATIE
+# -------------------------------------------------
 with tab2:
     with st.form("lesregistratie", clear_on_submit=True):
+        klas = st.selectbox("Klas", KLASSEN)
 
-        klas = st.selectbox(
-            "Klas / Groep",
-            KLASSEN
-        )
+        lesaanpak = st.slider("Lesaanpak", 1, 5, 3)
+        st.caption("1 = werkte niet · 5 = groot succes")
 
-        lesaanpak = st.slider(
-            "Lesaanpak",
-            1, 5, 3
-        )
-        st.caption(
-            "1 = mijn aanpak werkte helemaal niet · "
-            "3 = redelijk · "
-            "5 = mijn aanpak was een groot succes bij deze groep"
-        )
+        klasmanagement = st.slider("Klasmanagement", 1, 5, 3)
+        st.caption("1 = niet bij de les · 5 = volledig onder controle")
 
-        klasmanagement = st.slider(
-            "Klasmanagement",
-            1, 5, 3
-        )
-        st.caption(
-            "1 = het lukte mij helemaal niet deze klas bij de les te houden · "
-            "3 = wisselend · "
-            "5 = ik hield deze klas met gemak bij de les"
-        )
+        st.markdown("**Positieve lesmood**")
+        c1, c2 = st.columns(2)
+        positief = []
+        for i, m in enumerate(POS_MOODS):
+            if (c1 if i % 2 == 0 else c2).checkbox(m, key=f"p_{m}"):
+                positief.append(m)
 
-        positief = st.multiselect(
-            "Positieve lesmood",
-            POS_MOODS
-        )
-
-        negatief = st.multiselect(
-            "Negatieve lesmood",
-            NEG_MOODS
-        )
+        st.markdown("**Negatieve lesmood**")
+        c3, c4 = st.columns(2)
+        negatief = []
+        for i, m in enumerate(NEG_MOODS):
+            if (c3 if i % 2 == 0 else c4).checkbox(m, key=f"n_{m}"):
+                negatief.append(m)
 
         if st.form_submit_button("Les opslaan"):
             les_df.loc[len(les_df)] = [
-                date.today(),
-                klas,
-                lesaanpak,
-                klasmanagement,
-                ", ".join(positief),
-                ", ".join(negatief)
+                date.today(), klas, lesaanpak, klasmanagement,
+                ", ".join(positief), ", ".join(negatief)
             ]
-
             les_df.to_csv(LES_FILE, index=False)
             st.success("Les opgeslagen ✔️")
 
-# ---------------- VISUALISATIES ----------------
+# -------------------------------------------------
+# VISUALISATIES
+# -------------------------------------------------
 with tab3:
-    st.subheader("📊 Gemiddelde leskwaliteit per klas")
-
-    if les_df.empty:
-        st.info("Nog geen lesregistraties beschikbaar.")
-    else:
-        # Gemiddelden per klas
-        klas_stats = (
-            les_df
-            .groupby("Klas")[["Lesaanpak", "Klasmanagement"]]
-            .mean()
-            .reindex(KLASSEN)
-            .dropna(how="all")
-            .reset_index()
-        )
-
-        fig1 = px.bar(
-            klas_stats,
-            x="Klas",
-            y=["Lesaanpak", "Klasmanagement"],
-            barmode="group",
-            title="Vergelijking lesaanpak & klasmanagement per klas"
-        )
-        st.plotly_chart(fig1, use_container_width=True)
-
-    st.divider()
-    st.subheader("😊 Lesmood per klas")
-
     if not les_df.empty:
-        mood_data = []
+        stats = les_df.groupby("Klas")[["Lesaanpak", "Klasmanagement"]].mean().reset_index()
+        fig = px.bar(stats, x="Klas", y=["Lesaanpak", "Klasmanagement"], barmode="group")
+        st.plotly_chart(fig, use_container_width=True)
 
-        for _, row in les_df.iterrows():
-            for p in str(row["Positief"]).split(", "):
-                if p:
-                    mood_data.append([row["Klas"], p, "Positief"])
-            for n in str(row["Negatief"]).split(", "):
-                if n:
-                    mood_data.append([row["Klas"], n, "Negatief"])
+# -------------------------------------------------
+# PDF – VORIGE MAAND
+# -------------------------------------------------
+with tab4:
+    today = date.today()
+    last_month = (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
 
-        mood_df = pd.DataFrame(mood_data, columns=["Klas", "Mood", "Type"])
+    subset = day_df[day_df["Datum"].dt.strftime("%Y-%m") == last_month]
 
-        klas_filter = st.selectbox(
-            "Filter op klas",
-            ["Alle"] + KLASSEN
-        )
+    if subset.empty:
+        st.info("Nog geen gegevens voor vorige maand.")
+    else:
+        if st.button("Genereer maandrapport"):
+            path = f"{DATA_DIR}/{user['email'].split('@')[0]}_{last_month}.pdf"
+            doc = SimpleDocTemplate(path)
+            styles = getSampleStyleSheet()
+            story = [
+                Paragraph(f"<b>Maandrapport {last_month}</b>", styles["Title"]),
+                Spacer(1, 12),
+                Paragraph(f"Gemiddelde energie: {subset['Energie'].mean():.2f}", styles["Normal"]),
+                Paragraph(f"Gemiddelde stress: {subset['Stress'].mean():.2f}", styles["Normal"])
+            ]
+            doc.build(story)
 
-        plot_df = (
-            mood_df
-            if klas_filter == "Alle"
-            else mood_df[mood_df["Klas"] == klas_filter]
-        )
-
-        fig2 = px.bar(
-            plot_df.groupby(["Mood", "Type"]).size().reset_index(name="Aantal"),
-            x="Mood",
-            y="Aantal",
-            color="Type",
-            title="Sfeerwoorden per klas" if klas_filter == "Alle" else f"Sfeerwoorden – {klas_filter}"
-        )
-
-        st.plotly_chart(fig2, use_container_width=True)
-
-    # ---------------- PDF ----------------
-    with tab4:
-        today = date.today()
-        last_month = (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
-        subset = day_df[day_df["Datum"].dt.to_period("M").astype(str) == last_month]
-
-        if subset.empty:
-            st.info("Nog geen gegevens voor vorige maand.")
-        else:
-            if st.button("Genereer maandrapport"):
-                pdf_path = f"{DATA_DIR}/{user['email'].split('@')[0]}_{last_month}.pdf"
-                doc = SimpleDocTemplate(pdf_path)
-                styles = getSampleStyleSheet()
-                story = []
-
-                story.append(Paragraph(f"<b>Maandrapport {last_month}</b>", styles["Title"]))
-                story.append(Spacer(1, 12))
-                story.append(Paragraph(f"Gemiddelde energie: {subset['Energie'].mean():.2f}", styles["Normal"]))
-                story.append(Paragraph(f"Gemiddelde stress: {subset['Stress'].mean():.2f}", styles["Normal"]))
-
-                doc.build(story)
-
-                with open(pdf_path, "rb") as f:
-                    st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
-
-
-
-
-
-
+            with open(path, "rb") as f:
+                st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
