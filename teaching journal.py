@@ -239,34 +239,39 @@ with tab3:
         positief_series = les_df["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
         negatief_series = les_df["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
 
-        if positief_series.empty and negatief_series.empty:
-            st.info("Nog geen labels aangeduid.")
-        else:
-            all_labels = pd.concat([
-                pd.DataFrame({"Label": positief_series, "Type": "Positief"}),
-                pd.DataFrame({"Label": negatief_series, "Type": "Negatief"})
-            ])
+        all_labels = pd.concat([
+            pd.DataFrame({"Label": positief_series, "Type": "Positief"}),
+            pd.DataFrame({"Label": negatief_series, "Type": "Negatief"})
+        ])
+        # Filter lege labels
+        all_labels = all_labels[all_labels["Label"] != ""]
+
+        if not all_labels.empty:
             label_counts = all_labels.groupby(["Label", "Type"]).size().reset_index(name="Aantal")
+            words_freq = dict(zip(label_counts["Label"], label_counts["Aantal"]))
+            label_color = dict(zip(label_counts["Label"],
+                                   ["green" if t=="Positief" else "red" for t in label_counts["Type"]]))
 
-            if not label_counts.empty:
-                words_freq = dict(zip(label_counts["Label"], label_counts["Aantal"]))
-                label_color = dict(zip(label_counts["Label"],
-                                       ["green" if t=="Positief" else "red" for t in label_counts["Type"]]))
+            wc = WordCloud(
+                width=800,
+                height=400,
+                background_color="white",
+                prefer_horizontal=0.9,
+                min_font_size=10,
+                max_font_size=100,
+                random_state=42
+            ).generate_from_frequencies(words_freq)
 
-                wc = WordCloud(
-                    width=800,
-                    height=400,
-                    background_color="white",
-                    prefer_horizontal=0.9,
-                    min_font_size=10,
-                    max_font_size=100,
-                    random_state=42
-                ).generate_from_frequencies(words_freq)
-
-                fig, ax = plt.subplots(figsize=(12,6))
-                ax.imshow(wc.recolor(color_func=lambda w, **kw: label_color.get(w,"black")), interpolation="bilinear")
-                ax.axis("off")
-                st.pyplot(fig)
+            # Geef de kleur mee bij het plotten, geen aparte recolor
+            fig, ax = plt.subplots(figsize=(12,6))
+            ax.imshow(wc, interpolation="bilinear")
+            for word, freq in wc.words_.items():
+                color = label_color.get(word, "black")
+                wc.recolor(color_func=lambda *args, **kwargs: color)
+            ax.axis("off")
+            st.pyplot(fig)
+        else:
+            st.info("Nog geen labels aangeduid.")
 
         # -----------------------------
         # KLAS VERGELIJKING
@@ -277,7 +282,6 @@ with tab3:
         if len(klassen_uniek) < 2:
             st.info("Minstens 2 klassen nodig voor vergelijking.")
         else:
-            k1, k2 = st.columns(2)
             klas_keuze = st.multiselect("Selecteer exact 2 klassen om te vergelijken:", klassen_uniek, default=klassen_uniek[:2])
 
             if len(klas_keuze) != 2:
@@ -316,34 +320,35 @@ with tab3:
                     positief_series = df["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
                     negatief_series = df["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
 
-                    if positief_series.empty and negatief_series.empty:
-                        col.info(f"Geen labels beschikbaar voor {klas_name}")
-                    else:
-                        all_labels = pd.concat([
-                            pd.DataFrame({"Label": positief_series, "Type": "Positief"}),
-                            pd.DataFrame({"Label": negatief_series, "Type": "Negatief"})
-                        ])
+                    all_labels = pd.concat([
+                        pd.DataFrame({"Label": positief_series, "Type": "Positief"}),
+                        pd.DataFrame({"Label": negatief_series, "Type": "Negatief"})
+                    ])
+                    all_labels = all_labels[all_labels["Label"] != ""]
+
+                    if not all_labels.empty:
                         label_counts = all_labels.groupby(["Label", "Type"]).size().reset_index(name="Aantal")
+                        words_freq = dict(zip(label_counts["Label"], label_counts["Aantal"]))
+                        label_color = dict(zip(label_counts["Label"],
+                                               ["green" if t=="Positief" else "red" for t in label_counts["Type"]]))
 
-                        if not label_counts.empty:
-                            words_freq = dict(zip(label_counts["Label"], label_counts["Aantal"]))
-                            label_color = dict(zip(label_counts["Label"],
-                                                   ["green" if t=="Positief" else "red" for t in label_counts["Type"]]))
+                        wc = WordCloud(
+                            width=400,
+                            height=400,
+                            background_color="white",
+                            prefer_horizontal=0.9,
+                            min_font_size=10,
+                            max_font_size=100,
+                            random_state=42
+                        ).generate_from_frequencies(words_freq)
 
-                            wc = WordCloud(
-                                width=400,
-                                height=400,
-                                background_color="white",
-                                prefer_horizontal=0.9,
-                                min_font_size=10,
-                                max_font_size=100,
-                                random_state=42
-                            ).generate_from_frequencies(words_freq)
-
-                            fig, ax = plt.subplots(figsize=(6,6))
-                            ax.imshow(wc.recolor(color_func=lambda w, **kw: label_color.get(w,"black")), interpolation="bilinear")
-                            ax.axis("off")
-                            col.pyplot(fig)
+                        # Plotten
+                        fig, ax = plt.subplots(figsize=(6,6))
+                        ax.imshow(wc, interpolation="bilinear")
+                        ax.axis("off")
+                        col.pyplot(fig)
+                    else:
+                        col.info(f"Geen labels beschikbaar voor {klas_name}")
 
 # -------------------------------------------------
 # PDF – VORIGE MAAND
@@ -378,6 +383,7 @@ with tab4:
 
             with open(path, "rb") as f:
                 st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
