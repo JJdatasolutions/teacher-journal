@@ -367,20 +367,31 @@ else:
     # DAGGEVOEL
     # -------------------------------------------------
     with tab1:
+        # We halen de meest recente data op
+        current_day_df = pd.read_csv(DAY_FILE)
+        
         with st.form("daggevoel", clear_on_submit=True):
             d = st.date_input("Datum", date.today())
-
             energie = st.slider("Energie", 1, 5, 3)
-            st.caption("1 = uitgeput · 5 = barstend van energie")
-
             stress = st.slider("Stress", 1, 5, 3)
-            st.caption("1 = volkomen rustig · 5 = enorm gestresseerd")
 
-            if st.form_submit_button("Opslaan"):
-                day_df.loc[len(day_df)] = [d, energie, stress]
-                day_df.to_csv(DAY_FILE, index=False)
-                st.success("Geregistreerd! ✔️")
+            submit_dag = st.form_submit_button("Opslaan")
 
+            if submit_dag:
+                # 1. Zet de datum om naar string formaat dat matcht met je CSV
+                d_str = d.strftime('%Y-%m-%d')
+                
+                # 2. Nieuwe data voorbereiden
+                new_data = pd.DataFrame([{"Datum": d_str, "Energie": energie, "Stress": stress}])
+                
+                # 3. Bestaande data laden, nieuwe toevoegen en opslaan
+                updated_df = pd.concat([current_day_df, new_data], ignore_index=True)
+                updated_df.to_csv(DAY_FILE, index=False)
+                
+                st.success(f"Geregistreerd voor {d_str}! ✔️")
+                
+                # 4. CRUCIAAL: Herlaad de app zodat 'day_df' overal de nieuwe data bevat
+                st.rerun()
     # -------------------------------------------------
     # LESREGISTRATIE
     # -------------------------------------------------
@@ -587,6 +598,7 @@ else:
 
                 with open(path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
