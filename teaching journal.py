@@ -367,31 +367,37 @@ else:
     # DAGGEVOEL
     # -------------------------------------------------
     with tab1:
-        # We halen de meest recente data op
+        # 1. Laad de meest verse data direct uit het bestand
         current_day_df = pd.read_csv(DAY_FILE)
+        current_day_df["Datum"] = pd.to_datetime(current_day_df["Datum"]).dt.date
+
+        # 2. Check welke datum de gebruiker kiest
+        d = st.date_input("Datum", date.today())
         
-        with st.form("daggevoel", clear_on_submit=True):
-            d = st.date_input("Datum", date.today())
-            energie = st.slider("Energie", 1, 5, 3)
-            stress = st.slider("Stress", 1, 5, 3)
+        # 3. Is deze datum al geregistreerd?
+        already_done = d in current_day_df["Datum"].values
 
-            submit_dag = st.form_submit_button("Opslaan")
+        if already_done:
+            st.warning(f"⚠️ Je hebt voor {d} al een score ingevuld. Je kunt morgen weer registreren!")
+            # Toon de waarden van die dag als referentie
+            vandaag_data = current_day_df[current_day_df["Datum"] == d].iloc[0]
+            st.info(f"Geregistreerd: Energie {vandaag_data['Energie']} | Stress {vandaag_data['Stress']}")
+        else:
+            with st.form("daggevoel", clear_on_submit=True):
+                energie = st.slider("Energie", 1, 5, 3)
+                stress = st.slider("Stress", 1, 5, 3)
+                submit_dag = st.form_submit_button("Opslaan")
 
-            if submit_dag:
-                # 1. Zet de datum om naar string formaat dat matcht met je CSV
-                d_str = d.strftime('%Y-%m-%d')
-                
-                # 2. Nieuwe data voorbereiden
-                new_data = pd.DataFrame([{"Datum": d_str, "Energie": energie, "Stress": stress}])
-                
-                # 3. Bestaande data laden, nieuwe toevoegen en opslaan
-                updated_df = pd.concat([current_day_df, new_data], ignore_index=True)
-                updated_df.to_csv(DAY_FILE, index=False)
-                
-                st.success(f"Geregistreerd voor {d_str}! ✔️")
-                
-                # 4. CRUCIAAL: Herlaad de app zodat 'day_df' overal de nieuwe data bevat
-                st.rerun()
+                if submit_dag:
+                    # Nieuwe rij toevoegen
+                    new_row = pd.DataFrame([{"Datum": d, "Energie": energie, "Stress": stress}])
+                    updated_df = pd.concat([current_day_df, new_row], ignore_index=True)
+                    
+                    # Opslaan (we converteren datum naar string voor CSV)
+                    updated_df.to_csv(DAY_FILE, index=False)
+                    
+                    st.success(f"Geregistreerd voor {d}! ✔️")
+                    st.rerun()
     # -------------------------------------------------
     # LESREGISTRATIE
     # -------------------------------------------------
@@ -598,6 +604,7 @@ else:
 
                 with open(path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
