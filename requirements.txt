@@ -4,3 +4,4 @@ plotly
 reportlab
 wordcloud
 matplotlib
+st-gsheets-connection
