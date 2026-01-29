@@ -463,53 +463,91 @@ with tab3:
 
     st.divider()
 
+# 2. ALGEMENE STATISTIEKEN & WORDCLOUD
+st.subheader("🌍 Totaaloverzicht (Alle lessen)")
 
-        # 2. ALGEMENE STATISTIEKEN & WORDCLOUD
-        st.subheader("🌍 Totaaloverzicht (Alle lessen)")
-        
-        if not les_df.empty:
-            # --- NIEUW: Algemene gemiddeldes visueel weergeven ---
-            avg_aanpak_totaal = les_df["Lesaanpak"].mean()
-            avg_mgmt_totaal = les_df["Klasmanagement"].mean()
+if not les_df.empty:
+    # --- Algemene gemiddeldes ---
+    avg_aanpak_totaal = les_df["Lesaanpak"].mean()
+    avg_mgmt_totaal = les_df["Klasmanagement"].mean()
 
-            col_m1, col_m2 = st.columns(2)
-            with col_m1:
-                st.metric("Gem. Lesaanpak", f"{avg_aanpak_totaal:.2f} / 5")
-            with col_m2:
-                st.metric("Gem. Klasmanagement", f"{avg_mgmt_totaal:.2f} / 5")
-            
-            st.write("---") # Subtiele scheidingslijn tussen cijfers en WordCloud
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        st.metric("Gem. Lesaanpak", f"{avg_aanpak_totaal:.2f} / 5")
+    with col_m2:
+        st.metric("Gem. Klasmanagement", f"{avg_mgmt_totaal:.2f} / 5")
 
-            # --- WordCloud Logica ---
-            pos_series = les_df["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
-            neg_series = les_df["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
-            
-            all_labels = pd.concat([
-                pd.DataFrame({"Label": pos_series, "Type": "Positief"}),
-                pd.DataFrame({"Label": neg_series, "Type": "Negatief"})
-            ])
-            all_labels = all_labels[all_labels["Label"].str.len() > 0]
+    st.write("---")  # Scheidingslijn
 
-            if not all_labels.empty:
-                counts = all_labels.groupby(["Label", "Type"]).size().reset_index(name="Aantal")
-                words_freq = dict(zip(counts["Label"], counts["Aantal"]))
-                label_color_map = dict(zip(counts["Label"], ["green" if t == "Positief" else "red" for t in counts["Type"]]))
+    # --- WordCloud logica ---
+    pos_series = (
+        les_df["Positief"]
+        .dropna()
+        .astype(str)
+        .str.split(",")
+        .explode()
+        .str.strip()
+    )
 
-                from wordcloud import WordCloud
-                import matplotlib.pyplot as plt
+    neg_series = (
+        les_df["Negatief"]
+        .dropna()
+        .astype(str)
+        .str.split(",")
+        .explode()
+        .str.strip()
+    )
 
-                wc = WordCloud(width=800, height=400, background_color="white", random_state=42).generate_from_frequencies(words_freq)
-                
-                fig, ax = plt.subplots(figsize=(10, 5))
-                ax.imshow(wc.recolor(color_func=lambda word, **kwargs: label_color_map.get(word, "black")), interpolation="bilinear")
-                ax.axis("off")
-                st.pyplot(fig)
-            else:
-                st.info("Geen labels beschikbaar om de WordCloud te tonen.")
-        else:
-            st.info("Nog geen lesdata beschikbaar voor het totaaloverzicht.")
+    all_labels = pd.concat(
+        [
+            pd.DataFrame({"Label": pos_series, "Type": "Positief"}),
+            pd.DataFrame({"Label": neg_series, "Type": "Negatief"}),
+        ],
+        ignore_index=True,
+    )
 
-        st.divider()
+    all_labels = all_labels[all_labels["Label"].str.len() > 0]
+
+    if not all_labels.empty:
+        counts = (
+            all_labels
+            .groupby(["Label", "Type"])
+            .size()
+            .reset_index(name="Aantal")
+        )
+
+        words_freq = dict(zip(counts["Label"], counts["Aantal"]))
+        label_color_map = {
+            row["Label"]: ("green" if row["Type"] == "Positief" else "red")
+            for _, row in counts.iterrows()
+        }
+
+        from wordcloud import WordCloud
+        import matplotlib.pyplot as plt
+
+        wc = WordCloud(
+            width=800,
+            height=400,
+            background_color="white",
+            random_state=42,
+        ).generate_from_frequencies(words_freq)
+
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.imshow(
+            wc.recolor(
+                color_func=lambda word, **kwargs: label_color_map.get(word, "black")
+            ),
+            interpolation="bilinear",
+        )
+        ax.axis("off")
+        st.pyplot(fig)
+    else:
+        st.info("Geen labels beschikbaar om de WordCloud te tonen.")
+else:
+    st.info("Nog geen lesdata beschikbaar voor het totaaloverzicht.")
+
+st.divider()
+
 
         # 3. KLASSENVERGELIJKING
         st.subheader("🔎 Vergelijk 2 klassen")
@@ -592,6 +630,7 @@ with tab3:
 
                 with open(path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
