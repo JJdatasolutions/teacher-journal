@@ -8,6 +8,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
+from streamlit_gsheets import GSheetsConnection
 
 # -------------------------------------------------
 # CONFIG
@@ -21,6 +22,9 @@ st.set_page_config(
 DATA_DIR = "data"
 USERS_FILE = f"{DATA_DIR}/users.csv"
 os.makedirs(DATA_DIR, exist_ok=True)
+
+# Google Sheets URL voor Daggevoel
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1pz_9hhCSaTEkRs71nrTJiayfXksHJJMvSc08rYmxeu0/edit?usp=sharing"
 
 # -------------------------------------------------
 # HELPERS
@@ -123,17 +127,25 @@ KLASSEN = [
 # =================================================
 if user["role"] == "teacher":
 
-    DAY_FILE = day_file(user["email"])
     LES_FILE = lesson_file(user["email"])
 
-    if not os.path.exists(DAY_FILE):
-        pd.DataFrame(columns=["Datum","Energie","Stress"]).to_csv(DAY_FILE, index=False)
+    # Google Sheets Verbinding voor Daggevoel
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    
+    # Laden van data uit Google Sheets
+    try:
+        all_day_data = conn.read(spreadsheet=SHEET_URL)
+        # Filteren zodat je alleen je eigen data ziet
+        if "Email" in all_day_data.columns:
+            day_df = all_day_data[all_day_data["Email"] == user["email"]].copy()
+        else:
+            day_df = pd.DataFrame(columns=["Email", "Datum", "Energie", "Stress"])
+    except:
+        day_df = pd.DataFrame(columns=["Email", "Datum", "Energie", "Stress"])
+        all_day_data = day_df
+
     if not os.path.exists(LES_FILE):
         pd.DataFrame(columns=["Datum","Klas","Lesaanpak","Klasmanagement","Positief","Negatief"]).to_csv(LES_FILE, index=False)
-
-    day_df = pd.read_csv(DAY_FILE)
-    day_df["Datum"] = pd.to_datetime(day_df["Datum"], errors="coerce")
-    day_df = day_df.dropna(subset=["Datum"])
 
     les_df = pd.read_csv(LES_FILE)
 
@@ -154,9 +166,17 @@ if user["role"] == "teacher":
             stress = st.slider("Stress", 1, 5, 3)
 
             if st.form_submit_button("Opslaan"):
-                day_df.loc[len(day_df)] = [d, energie, stress]
-                day_df.to_csv(DAY_FILE, index=False)
-                st.success("Succesvol geregistreerd ✔️")
+                new_entry = pd.DataFrame({
+                    "Email": [user["email"]],
+                    "Datum": [str(d)],
+                    "Energie": [energie],
+                    "Stress": [stress]
+                })
+                # Voeg toe aan de totale lijst en upload naar GSheets
+                updated_all_data = pd.concat([all_day_data, new_entry], ignore_index=True)
+                conn.update(spreadsheet=SHEET_URL, data=updated_all_data)
+                
+                st.success("Succesvol geregistreerd in de cloud ✔️")
                 st.rerun()
 
     # -------------------------------------------------
@@ -190,13 +210,14 @@ if user["role"] == "teacher":
     with tab3:
         st.header("📊 Visualisaties")
 
-        day_df = pd.read_csv(DAY_FILE)
-        day_df["Datum"] = pd.to_datetime(day_df["Datum"], errors="coerce")
-        day_df = day_df.dropna(subset=["Datum"])
+        # Gebruik de gefilterde day_df van bovenaan
+        plot_df = day_df.copy()
+        plot_df["Datum"] = pd.to_datetime(plot_df["Datum"], errors="coerce")
+        plot_df = plot_df.dropna(subset=["Datum"])
 
-        if not day_df.empty:
+        if not plot_df.empty:
             fig = px.line(
-                day_df.sort_values("Datum"),
+                plot_df.sort_values("Datum"),
                 x="Datum",
                 y=["Energie","Stress"],
                 markers=True,
@@ -207,15 +228,9 @@ if user["role"] == "teacher":
         else:
             st.info("Nog geen daggevoel geregistreerd.")
 
-        # --- ALLES HIERONDER IS NU INGESPRONGEN EN VALT DUS BINNEN TAB 3 ---
-
-        # =================================================
-        # 2. ALGEMENE STATISTIEKEN & WORDCLOUD
-        # =================================================
         st.subheader("🌍 Totaaloverzicht (Alle lessen)")
 
         if not les_df.empty:
-            # --- Gemiddelden ---
             avg_aanpak_totaal = les_df["Lesaanpak"].mean()
             avg_mgmt_totaal = les_df["Klasmanagement"].mean()
 
@@ -227,178 +242,62 @@ if user["role"] == "teacher":
 
             st.write("---")
 
-            # --- WordCloud logica ---
-            pos_series = (
-                les_df["Positief"]
-                .dropna()
-                .astype(str)
-                .str.split(",")
-                .explode()
-                .str.strip()
-            )
-            neg_series = (
-                les_df["Negatief"]
-                .dropna()
-                .astype(str)
-                .str.split(",")
-                .explode()
-                .str.strip()
-            )
+            pos_series = les_df["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
+            neg_series = les_df["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
 
-            all_labels = pd.concat(
-                [
-                    pd.DataFrame({"Label": pos_series, "Type": "Positief"}),
-                    pd.DataFrame({"Label": neg_series, "Type": "Negatief"}),
-                ],
-                ignore_index=True,
-            )
-
+            all_labels = pd.concat([
+                pd.DataFrame({"Label": pos_series, "Type": "Positief"}),
+                pd.DataFrame({"Label": neg_series, "Type": "Negatief"}),
+            ], ignore_index=True)
             all_labels = all_labels[all_labels["Label"].str.len() > 0]
 
             if not all_labels.empty:
-                counts = (
-                    all_labels
-                    .groupby(["Label", "Type"])
-                    .size()
-                    .reset_index(name="Aantal")
-                )
-
+                counts = all_labels.groupby(["Label", "Type"]).size().reset_index(name="Aantal")
                 words_freq = dict(zip(counts["Label"], counts["Aantal"]))
-                label_color_map = {
-                    row["Label"]: ("green" if row["Type"] == "Positief" else "red")
-                    for _, row in counts.iterrows()
-                }
+                label_color_map = {row["Label"]: ("green" if row["Type"] == "Positief" else "red") for _, row in counts.iterrows()}
 
-                from wordcloud import WordCloud
-                import matplotlib.pyplot as plt
-
-                wc = WordCloud(
-                    width=800,
-                    height=400,
-                    background_color="white",
-                    random_state=42,
-                ).generate_from_frequencies(words_freq)
-
-                fig, ax = plt.subplots(figsize=(10, 5))
-                ax.imshow(
-                    wc.recolor(
-                        color_func=lambda word, **kwargs: label_color_map.get(word, "black")
-                    ),
-                    interpolation="bilinear",
-                )
+                wc = WordCloud(width=800, height=400, background_color="white", random_state=42).generate_from_frequencies(words_freq)
+                fig_wc, ax = plt.subplots(figsize=(10, 5))
+                ax.imshow(wc.recolor(color_func=lambda word, **kwargs: label_color_map.get(word, "black")), interpolation="bilinear")
                 ax.axis("off")
-                st.pyplot(fig)
+                st.pyplot(fig_wc)
             else:
-                st.info("Geen labels beschikbaar om de WordCloud te tonen.")
+                st.info("Geen labels beschikbaar.")
         else:
-            st.info("Nog geen lesdata beschikbaar voor het totaaloverzicht.")
+            st.info("Nog geen lesdata beschikbaar.")
 
         st.divider()
-
-        # =================================================
-        # 3. KLASSENVERGELIJKING
-        # =================================================
         st.subheader("🔎 Vergelijk 2 klassen")
 
         if not les_df.empty:
             beschikbare_klassen = sorted(les_df["Klas"].unique())
-            selected_klassen = st.multiselect(
-                "Selecteer exact 2 klassen:",
-                beschikbare_klassen,
-                max_selections=2,
-            )
+            selected_klassen = st.multiselect("Selecteer exact 2 klassen:", beschikbare_klassen, max_selections=2)
 
             if len(selected_klassen) == 2:
                 k1, k2 = selected_klassen
                 col1, col2 = st.columns(2)
-
                 for current_klas, current_col in zip([k1, k2], [col1, col2]):
                     with current_col:
                         st.markdown(f"### Klas: {current_klas}")
                         df_k = les_df[les_df["Klas"] == current_klas]
-
-                        avg_aanpak = df_k["Lesaanpak"].mean()
-                        avg_mgmt = df_k["Klasmanagement"].mean()
-                        st.metric("Gem. Lesaanpak", f"{avg_aanpak:.1f} / 5")
-                        st.metric("Gem. Management", f"{avg_mgmt:.1f} / 5")
-
-                        p_k = (
-                            df_k["Positief"]
-                            .dropna()
-                            .astype(str)
-                            .str.split(",")
-                            .explode()
-                            .str.strip()
-                        )
-                        n_k = (
-                            df_k["Negatief"]
-                            .dropna()
-                            .astype(str)
-                            .str.split(",")
-                            .explode()
-                            .str.strip()
-                        )
-
-                        labels_k = pd.concat(
-                            [
-                                pd.DataFrame({"Label": p_k, "Type": "Positief"}),
-                                pd.DataFrame({"Label": n_k, "Type": "Negatief"}),
-                            ],
-                            ignore_index=True,
-                        )
-
-                        labels_k = labels_k[labels_k["Label"].str.len() > 0]
-
-                        if not labels_k.empty:
-                            counts_k = (
-                                labels_k
-                                .groupby(["Label", "Type"])
-                                .size()
-                                .reset_index(name="Aantal")
-                            )
-
-                            freq_k = dict(zip(counts_k["Label"], counts_k["Aantal"]))
-                            color_map_k = {
-                                row["Label"]: (
-                                    "green" if row["Type"] == "Positief" else "red"
-                                )
-                                for _, row in counts_k.iterrows()
-                            }
-
-                            wc_k = WordCloud(
-                                width=400,
-                                height=400,
-                                background_color="white",
-                            ).generate_from_frequencies(freq_k)
-
-                            fig_k, ax_k = plt.subplots()
-                            ax_k.imshow(
-                                wc_k.recolor(
-                                    color_func=lambda word, **kwargs: color_map_k.get(
-                                        word, "black"
-                                    )
-                                ),
-                                interpolation="bilinear",
-                            )
-                            ax_k.axis("off")
-                            st.pyplot(fig_k)
-                        else:
-                            st.write("Geen labels voor deze klas.")
+                        st.metric("Gem. Lesaanpak", f"{df_k['Lesaanpak'].mean():.1f} / 5")
+                        st.metric("Gem. Management", f"{df_k['Klasmanagement'].mean():.1f} / 5")
             else:
-                st.info("Kies twee klassen uit de lijst om de vergelijking te starten.")
-        else:
-            st.info("Nog geen lesdata beschikbaar.")
+                st.info("Kies twee klassen.")
+
     # -------------------------------------------------
     # TAB 4 – MAANDRAPPORT
     # -------------------------------------------------
     with tab4:
         today = date.today()
         last_month = (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
-        day_df = pd.read_csv(DAY_FILE)
-        day_df["Datum"] = pd.to_datetime(day_df["Datum"], errors="coerce")
-        day_df = day_df.dropna(subset=["Datum"])
-
-        subset = day_df[day_df["Datum"].dt.strftime("%Y-%m") == last_month]
+        
+        # Gebruik gefilterde data van Sheets
+        report_df = day_df.copy()
+        report_df["Datum"] = pd.to_datetime(report_df["Datum"], errors="coerce")
+        report_df = report_df.dropna(subset=["Datum"])
+        
+        subset = report_df[report_df["Datum"].dt.strftime("%Y-%m") == last_month]
 
         if subset.empty:
             st.info("Nog geen gegevens voor vorige maand.")
@@ -416,6 +315,3 @@ if user["role"] == "teacher":
                 doc.build(story)
                 with open(path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
-
-
-
