@@ -132,6 +132,9 @@ if user["role"] == "teacher":
         pd.DataFrame(columns=["Datum","Klas","Lesaanpak","Klasmanagement","Positief","Negatief"]).to_csv(LES_FILE, index=False)
 
     day_df = pd.read_csv(DAY_FILE)
+    day_df["Datum"] = pd.to_datetime(day_df["Datum"], errors="coerce")
+    day_df = day_df.dropna(subset=["Datum"])
+
     les_df = pd.read_csv(LES_FILE)
 
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -188,7 +191,8 @@ if user["role"] == "teacher":
         st.header("📊 Visualisaties")
 
         day_df = pd.read_csv(DAY_FILE)
-        day_df["Datum"] = pd.to_datetime(day_df["Datum"])
+        day_df["Datum"] = pd.to_datetime(day_df["Datum"], errors="coerce")
+        day_df = day_df.dropna(subset=["Datum"])
 
         if not day_df.empty:
             fig = px.line(
@@ -209,6 +213,9 @@ if user["role"] == "teacher":
     with tab4:
         today = date.today()
         last_month = (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+        day_df = pd.read_csv(DAY_FILE)
+        day_df["Datum"] = pd.to_datetime(day_df["Datum"], errors="coerce")
+        day_df = day_df.dropna(subset=["Datum"])
 
         subset = day_df[day_df["Datum"].dt.strftime("%Y-%m") == last_month]
 
@@ -228,3 +235,4 @@ if user["role"] == "teacher":
                 doc.build(story)
                 with open(path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
