@@ -433,33 +433,36 @@ else:
                 st.success("Les opgeslagen ✔️")
 
     # -----------------------------
-    # TAB 3: VISUALISATIES
-    # -----------------------------
-    with tab3:
-        st.header("📊 Visualisaties")
+# TAB 3: VISUALISATIES
+# -----------------------------
+with tab3:
+    st.header("📊 Visualisaties")
 
-        # 1. DAGGEVOEL LIJNGRAFIEK
-        st.subheader("📈 Daggevoel (Energie & Stress)")
-        day_df = pd.read_csv(DAY_FILE)
-        day_df["Datum"] = pd.to_datetime(day_df["Datum"], errors="coerce")
-        day_df = day_df.dropna(subset=["Datum"])
+    st.subheader("📈 Daggevoel (Energie & Stress)")
 
+    # 🔁 Altijd opnieuw inlezen
+    day_df = pd.read_csv(DAY_FILE)
+    day_df["Datum"] = pd.to_datetime(day_df["Datum"], errors="coerce")
+    day_df = day_df.dropna(subset=["Datum"])
 
-            if not day_df_clean.empty:
-                fig_line = px.line(
-                    day_df_clean,
-                    x="Datum",
-                    y=["Energie", "Stress"],
-                    markers=True,
-                    title="Daggevoel door de tijd",
-                    color_discrete_map={"Energie": "#2ecc71", "Stress": "#e74c3c"}
-                )
-                fig_line.update_layout(yaxis_range=[0.5, 5.5])
-                st.plotly_chart(fig_line, use_container_width=True)
-        else:
-            st.info("Nog geen daggevoel geregistreerd.")
+    if not day_df.empty:
+        day_df_clean = day_df.sort_values("Datum")
 
-        st.divider()
+        fig_line = px.line(
+            day_df_clean,
+            x="Datum",
+            y=["Energie", "Stress"],
+            markers=True,
+            title="Daggevoel door de tijd",
+            color_discrete_map={"Energie": "#2ecc71", "Stress": "#e74c3c"}
+        )
+        fig_line.update_layout(yaxis_range=[0.5, 5.5])
+        st.plotly_chart(fig_line, use_container_width=True)
+    else:
+        st.info("Nog geen daggevoel geregistreerd.")
+
+    st.divider()
+
 
         # 2. ALGEMENE STATISTIEKEN & WORDCLOUD
         st.subheader("🌍 Totaaloverzicht (Alle lessen)")
@@ -589,6 +592,7 @@ else:
 
                 with open(path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
