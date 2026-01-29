@@ -380,6 +380,8 @@ else:
                 day_df.loc[len(day_df)] = [d, energie, stress]
                 day_df.to_csv(DAY_FILE, index=False)
                 st.success("Geregistreerd! ✔️")
+                st.rerun()
+
 
     # -------------------------------------------------
     # LESREGISTRATIE
@@ -438,10 +440,10 @@ else:
 
         # 1. DAGGEVOEL LIJNGRAFIEK
         st.subheader("📈 Daggevoel (Energie & Stress)")
-        if not day_df.empty:
-            day_df_clean = day_df.copy()
-            day_df_clean["Datum"] = pd.to_datetime(day_df_clean["Datum"], errors="coerce")
-            day_df_clean = day_df_clean.dropna(subset=["Datum"]).sort_values("Datum")
+        day_df = pd.read_csv(DAY_FILE)
+        day_df["Datum"] = pd.to_datetime(day_df["Datum"], errors="coerce")
+        day_df = day_df.dropna(subset=["Datum"])
+
 
             if not day_df_clean.empty:
                 fig_line = px.line(
@@ -587,6 +589,7 @@ else:
 
                 with open(path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
