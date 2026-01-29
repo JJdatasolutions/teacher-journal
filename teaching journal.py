@@ -274,17 +274,17 @@ if st.sidebar.button("Uitloggen"):
 # -------------------------------------------------
 POS_MOODS = [
     "Inspirerend", "Motiverend", "Actief", "Verbonden",
-    "Respectvol", "Gefocust", "Veilig", "Energiek"
+    "Respectvol", "Gefocust", "Veilig", "Energiek", "nieuwsgierig"
 ]
 
 NEG_MOODS = [
     "Demotiverend", "Passief", "Onrespectvol",
-    "Chaotisch", "Afgeleid", "Spannend", "Onveilig"
+    "Chaotisch", "Afgeleid", "Rumoerig", "Onveilig"
 ]
 
 KLASSEN = [
-    "5ECWI", "5HW", "5ECMT", "5MT", "3HW",
-    "6ECWI-HW", "6MT", "6WEWI", "6ECMT"
+    "5ECWI/WEWI/WEWIC", "5HW", "5ECMT/5MT/5WEMTC", "5MT", "3HW/3MT",
+    "6ECWI-HW", "6MT", "6WEWI", "6ECMT/6WEMT"
 ]
 
 # -------------------------------------------------
@@ -587,6 +587,7 @@ else:
 
                 with open(path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
