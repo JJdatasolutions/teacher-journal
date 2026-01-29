@@ -550,52 +550,98 @@ st.divider()
 
 
         # 3. KLASSENVERGELIJKING
-        st.subheader("🔎 Vergelijk 2 klassen")
-        if not les_df.empty:
-            beschikbare_klassen = sorted(les_df["Klas"].unique())
-            selected_klassen = st.multiselect("Selecteer exact 2 klassen:", beschikbare_klassen, max_selections=2)
+st.subheader("🔎 Vergelijk 2 klassen")
 
-            if len(selected_klassen) == 2:
-                k1, k2 = selected_klassen
-                col1, col2 = st.columns(2)
+if not les_df.empty:
+    beschikbare_klassen = sorted(les_df["Klas"].unique())
+    selected_klassen = st.multiselect(
+        "Selecteer exact 2 klassen:",
+        beschikbare_klassen,
+        max_selections=2,
+    )
 
-                for i, (current_klas, current_col) in enumerate(zip([k1, k2], [col1, col2])):
-                    with current_col:
-                        st.markdown(f"### Klas: {current_klas}")
-                        df_k = les_df[les_df["Klas"] == current_klas]
+    if len(selected_klassen) == 2:
+        k1, k2 = selected_klassen
+        col1, col2 = st.columns(2)
 
-                        # Scores
-                        avg_aanpak = df_k["Lesaanpak"].mean()
-                        avg_mgmt = df_k["Klasmanagement"].mean()
-                        st.metric("Gem. Lesaanpak", f"{avg_aanpak:.1f} / 5")
-                        st.metric("Gem. Management", f"{avg_mgmt:.1f} / 5")
+        for current_klas, current_col in zip([k1, k2], [col1, col2]):
+            with current_col:
+                st.markdown(f"### Klas: {current_klas}")
+                df_k = les_df[les_df["Klas"] == current_klas]
 
-                        # Klas-specifieke WordCloud
-                        p_k = df_k["Positief"].dropna().astype(str).str.split(",").explode().str.strip()
-                        n_k = df_k["Negatief"].dropna().astype(str).str.split(",").explode().str.strip()
-                        labels_k = pd.concat([
-                            pd.DataFrame({"Label": p_k, "Type": "Positief"}),
-                            pd.DataFrame({"Label": n_k, "Type": "Negatief"})
-                        ])
-                        labels_k = labels_k[labels_k["Label"].str.len() > 0]
+                # Scores
+                avg_aanpak = df_k["Lesaanpak"].mean()
+                avg_mgmt = df_k["Klasmanagement"].mean()
+                st.metric("Gem. Lesaanpak", f"{avg_aanpak:.1f} / 5")
+                st.metric("Gem. Management", f"{avg_mgmt:.1f} / 5")
 
-                        if not labels_k.empty:
-                            counts_k = labels_k.groupby(["Label", "Type"]).size().reset_index(name="Aantal")
-                            freq_k = dict(zip(counts_k["Label"], counts_k["Aantal"]))
-                            color_map_k = dict(zip(counts_k["Label"], ["green" if t == "Positief" else "red" for t in counts_k["Type"]]))
+                # Klas-specifieke WordCloud
+                p_k = (
+                    df_k["Positief"]
+                    .dropna()
+                    .astype(str)
+                    .str.split(",")
+                    .explode()
+                    .str.strip()
+                )
+                n_k = (
+                    df_k["Negatief"]
+                    .dropna()
+                    .astype(str)
+                    .str.split(",")
+                    .explode()
+                    .str.strip()
+                )
 
-                            wc_k = WordCloud(width=400, height=400, background_color="white").generate_from_frequencies(freq_k)
-                            fig_k, ax_k = plt.subplots()
-                            # FIX: Ook hier de lambda aanpassen
-                            ax_k.imshow(wc_k.recolor(color_func=lambda word, **kwargs: color_map_k.get(word, "black")), interpolation="bilinear")
-                            ax_k.axis("off")
-                            st.pyplot(fig_k)
-                        else:
-                            st.write("Geen labels voor deze klas.")
-            else:
-                st.info("Kies twee klassen uit de lijst om de vergelijking te starten.")
-        else:
-            st.info("Nog geen lesdata beschikbaar.")
+                labels_k = pd.concat(
+                    [
+                        pd.DataFrame({"Label": p_k, "Type": "Positief"}),
+                        pd.DataFrame({"Label": n_k, "Type": "Negatief"}),
+                    ],
+                    ignore_index=True,
+                )
+
+                labels_k = labels_k[labels_k["Label"].str.len() > 0]
+
+                if not labels_k.empty:
+                    counts_k = (
+                        labels_k
+                        .groupby(["Label", "Type"])
+                        .size()
+                        .reset_index(name="Aantal")
+                    )
+
+                    freq_k = dict(zip(counts_k["Label"], counts_k["Aantal"]))
+                    color_map_k = {
+                        row["Label"]: (
+                            "green" if row["Type"] == "Positief" else "red"
+                        )
+                        for _, row in counts_k.iterrows()
+                    }
+
+                    wc_k = WordCloud(
+                        width=400,
+                        height=400,
+                        background_color="white",
+                    ).generate_from_frequencies(freq_k)
+
+                    fig_k, ax_k = plt.subplots()
+                    ax_k.imshow(
+                        wc_k.recolor(
+                            color_func=lambda word, **kwargs: color_map_k.get(
+                                word, "black"
+                            )
+                        ),
+                        interpolation="bilinear",
+                    )
+                    ax_k.axis("off")
+                    st.pyplot(fig_k)
+                else:
+                    st.write("Geen labels voor deze klas.")
+    else:
+        st.info("Kies twee klassen uit de lijst om de vergelijking te starten.")
+else:
+    st.info("Nog geen lesdata beschikbaar.")
 
     # -------------------------------------------------
     # PDF – VORIGE MAAND
@@ -630,6 +676,7 @@ st.divider()
 
                 with open(path, "rb") as f:
                     st.download_button("Download PDF", f, file_name=f"Maandrapport_{last_month}.pdf")
+
 
 
 
